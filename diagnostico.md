@@ -1,3 +1,47 @@
+# Bloque 2 · El servidor por dentro
+
+Diagnóstico de `srv-mareas`, en solo lectura.
+
+## ¿Cómo se llama, qué sistema es y qué dirección tiene?
+
+`srv-mareas`, Ubuntu 24.04.5 LTS (kernel 6.8.0-147) en una VM KVM. IP fija 192.168.1.10/24 en `ens3`, puerta de enlace 192.168.1.1.
+
+## ¿Qué servicios están escuchando en la red y en qué puertos?
+
+Abiertos a toda la red, FTP (21), SSH (22), puerto 23 (inetd; falta confirmar qué servicio sirve, normalmente Telnet), nginx (80), Samba (139 y 445) y NetBIOS (UDP 137 y 138). Solo en local, MariaDB (3306) y DNS (53).
+
+## ¿Qué servicios están en marcha?
+
+23 servicios en marcha. Además de los del sistema, corren inetd, nginx, MariaDB, Samba, vsftpd, ModemManager, multipathd y udisks2..
+
+## ¿Qué usuarios existen?
+
+`administrador` (la jefa), `informatico` (externo), `asesores` (cuenta compartida, con bash), `becario` (con bash) y `asesoriafiscal` (externa, sin shell).
+
+## ¿Quién puede administrar el servidor?
+
+`administrador` e `informatico` por el grupo `sudo`. Además, `becario` tiene `NOPASSWD: ALL` en `/etc/sudoers.d/becario`, permisos de root sin contraseña.
+
+## ¿Quién ha entrado últimamente?
+
+`last` solo muestra reinicios desde el 11 de octubre, ninguna sesión de usuario.
+
+## ¿Qué carpetas se comparten, y con quién?
+
+Samba comparte `[clientes]` (`/srv/gestoria/clientes`) con `guest ok = Yes` y `read only = No`: la configuración permite entrar sin contraseña a cualquiera que llegue al puerto 445.
+
+## ¿Dónde están los documentos de los clientes y qué permisos tienen?
+
+En `/srv/gestoria/clientes`.
+
+## ¿Hay tareas programadas? ¿Qué hacen?
+
+`root` no tiene crontab. En `/etc/cron.d` hay `e2scrub_all` y `sysstat` (de serie) y `gestoria` (personalizado). 
+
+## ¿Cómo están organizados los discos?
+
+`vda` con `vda1` (19 GB, ext4, `/`), `vda15` (EFI) y `vda16` (`/boot`). Sin cifrado LUKS en `vda` y con `/srv` en la misma partición que el sistema. 
+
 # Bloque 3. El portátil y los puestos (CONTRASEÑA : Laura2026)
 
 ### Al encender el portátil, ¿pide algo antes de llegar  al      inicio de sesión?	
