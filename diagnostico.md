@@ -1,3 +1,21 @@
+# Bloque 1 . El mapa y las direcciones
+
+## ¿Qué equipos hay y cómo están conectados?
+![Captura 1](<Images/Captura 1.png>)
+## ¿Qué direcciones tiene el router y en qué interfaz?
+![Captura 1](<Images/Captura 2.png>)
+## ¿Qué direcciones reparte y a quién se las ha dado?
+![Captura 1](<Images/Captura 3.png>)
+![Captura 1](<Images/Captura 4.png>)
+## ¿Por dónde sale a Internet?
+![Captura 1](<Images/Captura 5.png>)
+## ¿Cómo está configurado el switch?
+![Captura 1](<Images/Captura 6.png>) 	 	
+## ¿Qué dirección tiene cada impresora?
+![Captura 1](<Images/Captura 7.png>)
+![Captura 1](<Images/Captura 8.png>)
+## ¿Qué equipos tienen dirección fija y cuáles la reciben del router?
+
 # Bloque 2 · El servidor por dentro
 
 Diagnóstico de `srv-mareas`, en solo lectura.
