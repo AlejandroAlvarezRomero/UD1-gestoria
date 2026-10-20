@@ -1,20 +1,35 @@
 # Bloque 1 . El mapa y las direcciones
 
 ## ¿Qué equipos hay y cómo están conectados?
+La red está formada por el operador externo, el router de la operadora, un switch de oficina, varios equipos de la LAN (servidor, portatil, puestos, impresoras y clientes móviles) y el acceso a Internet. La topología muestra cómo todos los dispositivos quedan conectados a la misma infraestructura interna.
+
 ![Captura 1](<Images/Captura 1.png>)
 ## ¿Qué direcciones tiene el router y en qué interfaz?
+El router principal tiene dos redes principales: ether2 para la LAN interna (192.168.1.0/24) y ether1 para la red externa del operador (192.168.122.0/24). Se observa también la dirección por defecto de la puerta de enlace y la interfaz asignada a cada segmento.
+
 ![Captura 1](<Images/Captura 2.png>)
 ## ¿Qué direcciones reparte y a quién se las ha dado?
+El DHCP tiene concesiones activas para estos equipos: el móvil, con la dirección 192.168.1.197; dos equipos identificados como `MSEDGEWIN10`, con 192.168.1.196 y 192.168.1.198; y el portátil de Laura (`portatil-laura`), con 192.168.1.200.
+
 ![Captura 1](<Images/Captura 3.png>)
 ![Captura 1](<Images/Captura 4.png>)
+
 ## ¿Por dónde sale a Internet?
+La ruta por defecto del router apunta a la red externa del operador mediante la interfaz ether1, mientras que la red local se mantiene en ether2. Esto confirma que el tráfico saliente hacia Internet pasa por el router de la operadora antes de salir al exterior.
+
 ![Captura 1](<Images/Captura 5.png>)
 ## ¿Cómo está configurado el switch?
+El switch tiene la VLAN 1 activa y los puertos Gi0/0 a Gi3/3 conectados a la LAN con estado “connected”. Se muestran también las direcciones MAC aprendidas por cada puerto, lo que confirma la infraestructura de acceso y la numeración de interfaces.
+
 ![Captura 1](<Images/Captura 6.png>) 	 	
 ## ¿Qué dirección tiene cada impresora?
+Cada impresora tiene una IP fija dentro de la subred 192.168.1.0/24, con gateway 192.168.1.1 y configuración de red similar. La captura muestra que ambas están en la misma red local y accesibles desde la oficina.
+
 ![Captura 1](<Images/Captura 7.png>)
 ![Captura 1](<Images/Captura 8.png>)
 ## ¿Qué equipos tienen dirección fija y cuáles la reciben del router?
+
+Los equipos que reciben IP por DHCP aparecen en el pool del router; los que tienen configuración fija se identifican porque no se muestran como concesiones del servidor DHCP. La diferencia entre ambos tipos de equipos queda reflejada en la asignación de direcciones dentro de la red local.
 
 # Bloque 2 · El servidor por dentro
 
@@ -156,4 +171,3 @@ Canal de datos FTP en modo pasivo:
 ###  Desde la asesoría, ¿se llega a la dirección exterior del router?
 
 Si se llega.
-
