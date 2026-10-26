@@ -75,7 +75,7 @@ En `/srv/gestoria/clientes`.
 
 `vda` con `vda1` (19 GB, ext4, `/`), `vda15` (EFI) y `vda16` (`/boot`). Sin cifrado LUKS en `vda` y con `/srv` en la misma partición que el sistema. 
 
-# Bloque 3. El portátil y los puestos (CONTRASEÑA : Laura2026)
+# Bloque 3. El portátil y los puestos 
 
 ### Al encender el portátil, ¿pide algo antes de llegar  al      inicio de sesión?	
 
