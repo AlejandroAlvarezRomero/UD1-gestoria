@@ -7,27 +7,24 @@
 
 #### 1.2 ¿Porqué hacemos así la Red?.
 
-Como podemos ver hay que hacer 3 VLANs, una que será para el Servidor (VLAN 10) que se podrá acceder a ella a traves de la VLAN20 y el Puerto 22 (SFTP/SSH). 
+Para segmentar la infraestructura de forma segura, implementaremos tres redes locales virtuales (VLAN). La primera de ellas es la VLAN 10, dedicada en exclusiva al servidor, a la cual se accederá desde la red interna de los empleados y, de forma segura, desde el exterior.
 
-<br>
+__¿Cómo funciona la comunicación con el exterior?__
 
-__¿Como funciona la comunicación con el exterior?__
+Anteriormente, la Asesoría Fiscal externa se comunicaba mediante FTP, un protocolo inseguro que transmite la información en texto claro, exponiendo los datos a posibles interceptaciones o ataques de intermediario (Man-in-the-Middle).
 
-_Desde la asesoría Fiscal para comunicarse con nosotros lo hacia a traves de FTP, un protocolo que no es seguro ya que los atacantes podían usar la técnica Man-in-the-Middle,y ver el contenido que enviamos._
+Con esta nueva implantación, la comunicación externa se realizará de forma cifrada mediante SFTP/SSH (puerto 22). Se configurará una regla de redirección (NAT) en el router de la operadora para que cualquier petición entrante por este puerto sea enviada directamente a la VLAN 10. De esta forma, el acceso desde el exterior queda confinado al servidor: nadie desde fuera tendrá visibilidad de la red de los empleados (VLAN 20), mientras que la plantilla podrá seguir conectándose a la VLAN 10 para recoger o depositar los archivos de la asesoría.
 
-_Ahora con esta nueva implantación, la asesoría solo podrá comunicarse con nosotros por el puerto 22 (SFTP/SSH) , la asesoria nos manda archivos que circulan por el puerto 22, y el router tendrá reglas escritas que cualquier archivo enviado por este puerto sera reenviado a la VLAN 10. Asi nadie tendrá acceso a VLAN 20 y desde la VLAN 20 se podrá acceder a VLAN 10 para coger los archivos._
 
----
+Por otro lado, configuraremos la VLAN 20 para albergar a toda la plantilla de la gestoría (puestos e impresoras). Desde esta red, los empleados tendrán salida a Internet y acceso controlado al servidor.   
 
-Luego nos encontramos con la VLAN  para la plantilla entera (VLAN 10), que se podra acceder solo a internet y a la VLAN 10.
-
-Y por ultimo, una VLAN para los clientes que solo tendrán acceso a internet. (VLAN 30).
-
-Dejaremos fuera de cualquier VLAN el ordenador usado para pruebas.
+Finalmente, se habilitará la VLAN 30 para aislar la red inalámbrica que se ofrece a los clientes en la sala de espera, limitando su conexión estrictamente a Internet. El equipo de auditoría y pruebas (Kali) se mantendrá fuera del entorno de producción.
 
 <br>
 
 #### 1.3 Reparto de Direcciones.
+
+<br>
 
 | Segmento y función | VLAN o interfaz | Red/prefijo | Rango utilizable | Puerta de enlace |
 |---|---|---|---|---|
@@ -37,11 +34,18 @@ Dejaremos fuera de cualquier VLAN el ordenador usado para pruebas.
 
 <br></br>
 
-#### 1.4 ¿Que es lo que permite y que es lo que bloquea?
+#### 1.4 ¿Qué se permite y qué se bloquea?
 
-Lo que permite tener las VLANs creadas y el protocolo FTP actualizado al SFTP/SSH en el puerto 22 es que esta todo aislado y particionado para mayor seguridad, por ejemplo tenemos bloqueado que los clientes conectándose al wifi que le ofrecemos en la sala de espera puedan acceder a nuestros servidores o a cualquier espacio de trabajo de un empleado. Ya la asesoria solo se podrá conectar al servidor a traves del puerto 22, puerto dedicado al SFTP/SSH pasando por el troncal. Y ademas los empleados solo podrán acceder a Internet y a la WLAN 10, la del servidor, a traves del puerto 445 (SAMBA) y el puerto 80 (HTTP)
+La implementación de las VLANs y la actualización al protocolo seguro SFTP garantizan el aislamiento lógico de los departamentos, elevando la seguridad global de la red. Las políticas de enrutamiento y cortafuegos aplicadas en el router establecerán las siguientes reglas de control de tráfico:   
 
+
+- Bloqueo hacia recursos internos desde la sala de espera: Se deniega cualquier intento de conexión desde la VLAN 30 (Clientes) hacia la red de los empleados o hacia el servidor. Los clientes solo dispondrán de salida a Internet.   
 <br>
+
+- Acceso externo confinado: La Asesoría Fiscal externa únicamente tiene permitido el paso a través del túnel seguro del puerto 22 (SFTP/SSH) con destino exclusivo a la VLAN 10, atravesando el enlace troncal (802.1Q).   
+<br>
+
+- Acceso interno acotado (Mínimo privilegio de red): La plantilla (VLAN 20) tiene permitido el acceso a Internet y la comunicación con el servidor (VLAN 10), pero restringida estrictamente a los puertos de trabajo necesarios: el puerto 445 (Samba para documentos) y el puerto 80 (HTTP para la intranet web).
 
 # 2. LAS MEDIDAS
 
