@@ -1,8 +1,6 @@
 
 # 1. LA RED
 
-# 1. LA RED
-
 #### 1.1 Esquema Nueva Red.
 
 ![Dibujo_RED](./Images/cambio%20red.jpg)
