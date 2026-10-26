@@ -1,6 +1,50 @@
 
 # 1. LA RED
 
+# 1. LA RED
+
+#### 1.1 Esquema Nueva Red.
+
+![Dibujo_RED](./Images/cambio%20red.jpg)
+
+#### 1.2 ¿Porqué hacemos así la Red?.
+
+Como podemos ver hay que hacer 3 VLANs, una que será para el Servidor (VLAN 10) que se podrá acceder a ella a traves de la VLAN20 y el Puerto 22 (SFTP/SSH). 
+
+<br>
+
+__¿Como funciona la comunicación con el exterior?__
+
+_Desde la asesoría Fiscal para comunicarse con nosotros lo hacia a traves de FTP, un protocolo que no es seguro ya que los atacantes podían usar la técnica Man-in-the-Middle,y ver el contenido que enviamos._
+
+_Ahora con esta nueva implantación, la asesoría solo podrá comunicarse con nosotros por el puerto 22 (SFTP/SSH) , la asesoria nos manda archivos que circulan por el puerto 22, y el router tendrá reglas escritas que cualquier archivo enviado por este puerto sera reenviado a la VLAN 10. Asi nadie tendrá acceso a VLAN 20 y desde la VLAN 20 se podrá acceder a VLAN 10 para coger los archivos._
+
+---
+
+Luego nos encontramos con la VLAN  para la plantilla entera (VLAN 10), que se podra acceder solo a internet y a la VLAN 10.
+
+Y por ultimo, una VLAN para los clientes que solo tendrán acceso a internet. (VLAN 30).
+
+Dejaremos fuera de cualquier VLAN el ordenador usado para pruebas.
+
+<br>
+
+#### 1.3 Reparto de Direcciones.
+
+| Segmento y función | VLAN o interfaz | Red/prefijo | Rango utilizable | Puerta de enlace |
+|---|---|---|---|---|
+| Plantilla Empresa | VLAN20 | 192.168.1.0/26 | 192.168.1.1 - 192.168.1.62 | 192.168.1.1 |
+| Clientes | VLAN30 | 192.168.1.64/26 | 192.168.1.65 - 192.168.1.126 | 192.168.1.65 |
+| Servidor | VLAN10 | 192.168.1.128/28 | 192.168.1.129 - 192.168.1.141 | 192.168.1.129 |
+
+<br></br>
+
+#### 1.4 ¿Que es lo que permite y que es lo que bloquea?
+
+Lo que permite tener las VLANs creadas y el protocolo FTP actualizado al SFTP/SSH en el puerto 22 es que esta todo aislado y particionado para mayor seguridad, por ejemplo tenemos bloqueado que los clientes conectándose al wifi que le ofrecemos en la sala de espera puedan acceder a nuestros servidores o a cualquier espacio de trabajo de un empleado. Ya la asesoria solo se podrá conectar al servidor a traves del puerto 22, puerto dedicado al SFTP/SSH pasando por el troncal. Y ademas los empleados solo podrán acceder a Internet y a la WLAN 10, la del servidor, a traves del puerto 445 (SAMBA) y el puerto 80 (HTTP)
+
+<br>
+
 # 2. LAS MEDIDAS
 
 ### Medida: Aislar la red de clientes mediante VLAN
