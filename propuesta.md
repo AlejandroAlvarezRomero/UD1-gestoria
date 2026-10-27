@@ -1,4 +1,3 @@
-
 # 1. LA RED
 
 #### 1.1 Esquema Nueva Red.
@@ -7,16 +6,12 @@
 
 #### 1.2 ¿Porqué hacemos así la Red?.
 
-Para segmentar la infraestructura de forma segura, implementaremos tres redes locales virtuales (VLAN). La primera de ellas es la VLAN 10, dedicada en exclusiva al servidor, a la cual se accederá desde la red interna de los empleados y, de forma segura, desde el exterior.
+Para segmentar la infraestructura de forma segura, implementaremos tres redes locales virtuales (VLAN). La primera de ellas es la VLAN 10, dedicada en exclusiva al servidor, a la cual se accederá desde la red interna de los empleados y, de forma controlada, desde el exterior.
 
-__¿Cómo funciona la comunicación con el exterior?__
+**¿Cómo funciona la comunicación con el exterior?**
+Para cumplir con la premisa de no alterar la forma de trabajar de clientes externos, mantendremos el protocolo FTP que utiliza la Asesoría Fiscal. Sin embargo, para mitigar el riesgo de exponer este servicio en texto claro a todo Internet, se acotará estrictamente en el firewall del router: la regla de redirección (NAT) hacia el servidor solo admitirá peticiones de conexión que provengan de la IP pública conocida de la Asesoría Fiscal (`192.168.122.50`). Cualquier otro intento de conexión al puerto 21 desde el exterior será descartado automáticamente.
 
-Anteriormente, la Asesoría Fiscal externa se comunicaba mediante FTP, un protocolo inseguro que transmite la información en texto claro, exponiendo los datos a posibles interceptaciones o ataques de intermediario (Man-in-the-Middle).
-
-Con esta nueva implantación, la comunicación externa se realizará de forma cifrada mediante SFTP/SSH (puerto 22). Se configurará una regla de redirección (NAT) en el router de la operadora para que cualquier petición entrante por este puerto sea enviada directamente a la VLAN 10. De esta forma, el acceso desde el exterior queda confinado al servidor: nadie desde fuera tendrá visibilidad de la red de los empleados (VLAN 20), mientras que la plantilla podrá seguir conectándose a la VLAN 10 para recoger o depositar los archivos de la asesoría.
-
-
-Por otro lado, configuraremos la VLAN 20 para albergar a toda la plantilla de la gestoría (puestos e impresoras). Desde esta red, los empleados tendrán salida a Internet y acceso controlado al servidor.   
+Por otro lado, configuraremos la VLAN 20 para albergar a toda la plantilla de la gestoría (puestos e impresoras). Desde esta red, los empleados tendrán salida a Internet y acceso controlado al servidor.
 
 Finalmente, se habilitará la VLAN 30 para aislar la red inalámbrica que se ofrece a los clientes en la sala de espera, limitando su conexión estrictamente a Internet. El equipo de auditoría y pruebas (Kali) se mantendrá fuera del entorno de producción.
 
@@ -24,127 +19,113 @@ Finalmente, se habilitará la VLAN 30 para aislar la red inalámbrica que se ofr
 
 #### 1.3 Reparto de Direcciones.
 
-<br>
+Se ha modificado el orden de asignación en la VLAN 10 para garantizar que el servidor reciba la dirección IP más pequeña disponible en su subred.
 
 | Segmento y función | VLAN o interfaz | Red/prefijo | Rango utilizable | Puerta de enlace |
 |---|---|---|---|---|
-| Plantilla Empresa | VLAN20 | 192.168.1.0/26 | 192.168.1.1 - 192.168.1.62 | 192.168.1.1 |
-| Clientes | VLAN30 | 192.168.1.64/26 | 192.168.1.65 - 192.168.1.126 | 192.168.1.65 |
-| Servidor | VLAN10 | 192.168.1.128/28 | 192.168.1.129 - 192.168.1.141 | 192.168.1.129 |
+| Plantilla Empresa | VLAN20 | 192.168.1.0/26 | 192.168.1.1 - 192.168.1.62 | 192.168.1.62 |
+| Clientes | VLAN30 | 192.168.1.64/26 | 192.168.1.65 - 192.168.1.126 | 192.168.1.126 |
+| Servidor | VLAN10 | 192.168.1.128/28 | **192.168.1.129 (Servidor)** - 192.168.1.141 | 192.168.1.142 |
 
-<br></br>
+<br>
 
 #### 1.4 ¿Qué se permite y qué se bloquea?
 
-La implementación de las VLANs y la actualización al protocolo seguro SFTP garantizan el aislamiento lógico de los departamentos, elevando la seguridad global de la red. Las políticas de enrutamiento y cortafuegos aplicadas en el router establecerán las siguientes reglas de control de tráfico:   
-
-
-- Bloqueo hacia recursos internos desde la sala de espera: Se deniega cualquier intento de conexión desde la VLAN 30 (Clientes) hacia la red de los empleados o hacia el servidor. Los clientes solo dispondrán de salida a Internet.   
-<br>
-
-- Acceso externo confinado: La Asesoría Fiscal externa únicamente tiene permitido el paso a través del túnel seguro del puerto 22 (SFTP/SSH) con destino exclusivo a la VLAN 10, atravesando el enlace troncal (802.1Q).   
-<br>
-
-- Acceso interno acotado (Mínimo privilegio de red): La plantilla (VLAN 20) tiene permitido el acceso a Internet y la comunicación con el servidor (VLAN 10), pero restringida estrictamente a los puertos de trabajo necesarios: el puerto 445 (Samba para documentos) y el puerto 80 (HTTP para la intranet web).
+- **Bloqueo hacia recursos internos desde la sala de espera:** Se deniega cualquier intento de conexión desde la VLAN 30 (Clientes) hacia la red de los empleados o hacia el servidor. Los clientes solo dispondrán de salida a Internet.
+- **Acceso externo confinado (FTP acotado):** La Asesoría Fiscal externa tiene permitido el acceso FTP (puertos 21 y 40000-40050) hacia el servidor en la VLAN 10, pero el router bloqueará cualquier intento de conexión a estos puertos que no provenga de la IP específica de la asesoría (`192.168.122.50`).
+- **Acceso interno acotado:** La plantilla (VLAN 20) tiene permitido el acceso a Internet y la comunicación con el servidor (VLAN 10) restringida a los puertos 445 (Samba) y 80 (HTTP).
 
 # 2. LAS MEDIDAS
 
 ### Medida: Aislar la red de clientes mediante VLAN
-- Qué problema resuelve y cómo lo sabemos: El móvil de un cliente recibe una IP de la misma red que la oficina (`192.168.1.0/24`) y puede alcanzar el servidor.
-- Qué hacemos: endurecer
-- Qué cambiamos y en qué equipo: Configurar una VLAN de invitados en el switch y el router existentes, sin adquirir hardware, y permitir desde ella solo el acceso a Internet y a los servicios necesarios para conectarse. Confirmar antes que los equipos actuales admiten esta configuración.
-- A quién afecta: A los clientes que usan la red de invitados y a quien administre el router y la infraestructura de red.
-- Cómo comprobaremos que protege y que la gestoría sigue trabajando: Desde un móvil de cliente, comprobar que obtiene una IP de otra red, accede a Internet y no alcanza el servidor, las impresoras ni los equipos de oficina. Desde un puesto de trabajo, comprobar que siguen funcionando los servicios necesarios. Pendiente: confirmar qué equipo e interfaces están disponibles y si algún servicio interno debe ofrecerse a los clientes.
+- **Qué problema resuelve y cómo lo sabemos:** El móvil de un cliente recibe una IP de la misma red que la oficina (`192.168.1.0/24`) y puede alcanzar el servidor.
+- **Qué hacemos:** endurecer
+- **Qué cambiamos y en qué equipo:** Configurar la VLAN 30 en el switch y router existentes. Permitir desde ella solo acceso a Internet.
+- **A quién afecta:** A los clientes en la sala de espera.
+- **Cómo comprobaremos que protege y que la gestoría sigue trabajando:** Desde el móvil del cliente, comprobar que recibe IP de la nueva red, sale a Internet y el ping al servidor o impresoras es rechazado.
 
 ### Medida: Segmentar la red interna mediante VLAN
-- Qué problema resuelve y cómo lo sabemos: El switch muestra activa la VLAN 1 y los equipos de distintos usos están en la LAN `192.168.1.0/24`.
-- Qué hacemos: endurecer
-- Qué cambiamos y en qué equipo: Crear VLAN según la función de los equipos —puestos, servidores, impresoras y gestión— y configurar sus puertos de acceso y troncales en el switch. Configurar el enrutamiento en el router para permitir solo las comunicaciones necesarias.
-- A quién afecta: Al personal, al servidor, a las impresoras y a quien administre la red.
-- Cómo comprobaremos que protege y que la gestoría sigue trabajando: Verificar la VLAN asignada a cada puerto y probar las comunicaciones permitidas y bloqueadas entre segmentos. Confirmar que los puestos siguen accediendo a los servicios de trabajo. Pendiente: identificar qué dispositivo está conectado a cada puerto y confirmar que los equipos de red soportan VLAN.
+- **Qué problema resuelve y cómo lo sabemos:** El switch muestra activa la VLAN 1 y todos conviven en el mismo dominio de difusión.
+- **Qué hacemos:** endurecer
+- **Qué cambiamos y en qué equipo:** Crear VLAN 10 y 20 en el switch. Configurar enrutamiento y reglas de firewall en el router MikroTik para permitir a la VLAN 20 alcanzar solo puertos específicos de la VLAN 10.
+- **A quién afecta:** Transparente para la plantilla.
+- **Cómo comprobaremos que protege y que la gestoría sigue trabajando:** Verificar que un puesto de la VLAN 20 accede a la carpeta compartida, pero no puede lanzar tráfico no autorizado a otras subredes.
 
 ### Medida: Proteger el acceso a BIOS/UEFI y el arranque
-- Qué problema resuelve y cómo lo sabemos: El diagnóstico indica que el portátil no pide credenciales antes del inicio de sesión, pero no especifica si tiene contraseña de BIOS/UEFI ni si permite arrancar desde dispositivos externos. El servidor es una máquina virtual KVM.
-- Qué hacemos: endurecer
-- Qué cambiamos y en qué equipo: En el portátil, revisar la configuración de BIOS/UEFI, definir una contraseña de administración, deshabilitar el arranque externo no autorizado y fijar un orden de arranque seguro. Para el servidor virtual, revisar con la jefa las medidas disponibles en el equipo anfitrión y el hipervisor. No incluir las contraseñas reales en la documentación.
-- A quién afecta: A Laura, a quien administre el portátil y a quien administre el servidor y el hipervisor.
-- Cómo comprobaremos que protege y que la gestoría sigue trabajando: Reiniciar y comprobar que se mantiene el orden de arranque, que no se inicia desde un dispositivo externo no autorizado y que el sistema arranca normalmente. Pendiente: confirmar quién custodia las contraseñas y administra el equipo anfitrión. Esta medida no sustituye al cifrado de disco.
+- **Qué problema resuelve y cómo lo sabemos:** El portátil no pide credenciales antes del inicio y permite modificar el arranque.
+- **Qué hacemos:** endurecer
+- **Qué cambiamos y en qué equipo:** Definir contraseña de administrador en BIOS/UEFI del portátil, deshabilitar arranque por USB/PXE y fijar el disco interno como única opción.
+- **A quién afecta:** A quien intente formatear o arrancar el equipo con un Live USB.
+- **Cómo comprobaremos que protege y que la gestoría sigue trabajando:** Entrar al menú de la BIOS o presionar F12 en el arranque y confirmar que se exige contraseña.
+
+### Medida: Cifrado de disco (LUKS) en portátil y servidor
+- **Qué problema resuelve y cómo lo sabemos:** En septiembre se robó un portátil y se desconoce si leyeron los datos. El servidor actual almacena documentos en texto claro en sus discos. La contraseña de BIOS no impide que extraigan el disco físico.
+- **Qué hacemos:** endurecer
+- **Qué cambiamos y en qué equipo:** Aplicar cifrado LUKS en el disco del portátil (Ubuntu Desktop) y en la partición de datos del servidor (`/srv/samba/clientes`).
+- **A quién afecta:** A Laura (deberá poner la clave al encender el portátil) y al administrador (deberá desbloquear el volumen de datos del servidor tras un reinicio total).
+- **Cómo comprobaremos que protege y que la gestoría sigue trabajando:** Arrancar un Live CD/Kali, intentar montar la partición del portátil o del servidor y comprobar que el sistema de archivos es ilegible sin la clave de descifrado.
 
 ### Medida: Documentar una instalación inicial controlada y mínima
-- Qué problema resuelve y cómo lo sabemos: El servidor ya está instalado con Ubuntu 24.04.5 en una máquina virtual KVM, pero el diagnóstico no describe cómo se instaló ni documenta un procedimiento repetible.
-- Qué hacemos: endurecer
-- Qué cambiamos y en qué equipo: Documentar un procedimiento para instalar una máquina de prueba en un entorno aislado o controlado, incluyendo únicamente los componentes necesarios para su uso previsto. No reinstalar el servidor de producción sin autorización.
-- A quién afecta: A quien prepare o mantenga el servidor y al personal que dependa de sus servicios.
-- Cómo comprobaremos que protege y que la gestoría sigue trabajando: Repetir el procedimiento en una máquina virtual de prueba, revisar los componentes instalados y comprobar que los servicios previstos funcionan. Pendiente: preguntar a la jefa si se puede crear una máquina de prueba y qué funciones debe ofrecer el servidor.
+- **Qué problema resuelve y cómo lo sabemos:** El servidor se instaló "con de todo por si acaso" en una KVM sin proceso repetible.
+- **Qué hacemos:** endurecer
+- **Qué cambiamos y en qué equipo:** Documentar la instalación de un Ubuntu Server Minimal en entorno aislado, añadiendo solo los paquetes estrictamente necesarios.
+- **A quién afecta:** A quien administre la infraestructura.
+- **Cómo comprobaremos que protege y que la gestoría sigue trabajando:** Desplegar una máquina virtual de prueba siguiendo la documentación y verificar que el sistema es funcional y carece de bloatware.
 
-### Medida: Inventariar y reducir los servicios del servidor
-- Qué problema resuelve y cómo lo sabemos: El servidor expone FTP (21), SSH (22), el puerto 23 asociado a `inetd` —servicio pendiente de identificar—, nginx (80), Samba (139 y 445) y NetBIOS (UDP 137 y 138). También están activos MariaDB, DNS y otros servicios. Samba permite acceso de invitado con escritura a la carpeta `clientes`.
-- Qué hacemos: quitar los servicios innecesarios y acotar los que se deban mantener
-- Qué cambiamos y en qué equipo: Elaborar un inventario de programas, servicios, puertos y protocolos de `srv-mareas`. Tras confirmar su uso con la jefa, desactivar lo que no sea necesario. Restringir Samba a usuarios autorizados y quitar el acceso de invitado con escritura. Identificar qué servicio usa el puerto 23 antes de decidir si se elimina.
-- A quién afecta: Al personal que accede a documentos y aplicaciones, a los usuarios de los servicios del servidor y a quien administre `srv-mareas`.
-- Cómo comprobaremos que protege y que la gestoría sigue trabajando: Comparar el inventario antes y después, reiniciar y comprobar que los servicios retirados no vuelven a arrancar. Probar que los usuarios no autorizados no acceden a los documentos y que los usuarios autorizados siguen trabajando. Pendiente: confirmar qué servicios necesita realmente la gestoría.
+### Medida: Inventariar, reducir y acotar los servicios del servidor
+- **Qué problema resuelve y cómo lo sabemos:** El servidor expone servicios innecesarios (`inetd` en puerto 23, NetBIOS 137/138, DNS, etc.) y Samba permite acceso de invitado a toda la LAN.
+- **Qué hacemos:** quitar y acotar
+- **Qué cambiamos y en qué equipo:** En el servidor:
+  1. **Se quita:** Desinstalar/deshabilitar `inetd`, `avahi-daemon`, DNS innecesario y deshabilitar NetBIOS.
+  2. **Se acota:** En `/etc/samba/smb.conf`, restringir el acceso (`hosts allow = 192.168.1.0/26 127.0.0.1`), forzar protocolo SMB3 y deshabilitar el acceso de invitado.
+- **A quién afecta:** A toda la plantilla, que ahora debe usar su usuario y contraseña para entrar a Samba.
+- **Cómo comprobaremos que protege y que la gestoría sigue trabajando:** `ss -tulpn` mostrará una reducción drástica de puertos a la escucha. Los puestos de trabajo Windows accederán a Samba introduciendo credenciales.
 
-### Medida: Revisar el acceso desde Internet y los servicios del router
-- Qué problema resuelve y cómo lo sabemos: El router redirige desde Internet los puertos FTP 21 y 40000–40050 al servidor. También tiene habilitados servicios como Telnet, FTP, web, API, SSH y Winbox.
-- Qué hacemos: acotar
-- Qué cambiamos y en qué equipo: Revisar las reglas del router y deshabilitar los servicios de administración que no se utilicen. Limitar el acceso administrativo a equipos o redes autorizados. Confirmar con la jefa si la asesoría fiscal necesita el FTP antes de modificar las redirecciones.
-- A quién afecta: A quien administra el router, a la asesoría fiscal y a las personas que usan los servicios publicados.
-- Cómo comprobaremos que protege y que la gestoría sigue trabajando: Comprobar desde una red externa que solo se puede acceder a los servicios autorizados y que los servicios de administración no están disponibles para usuarios no autorizados. Verificar con la asesoría que el intercambio de información necesario sigue funcionando. Pendiente: confirmar si FTP es imprescindible y qué alternativa o acceso restringido se utilizará.
+### Medida: Revisar el acceso desde Internet y acotar el servicio FTP del router
+- **Qué problema resuelve y cómo lo sabemos:** El router redirige los puertos 21 y 40000-40050 (FTP) a todo Internet sin filtro, permitiendo intentos de intrusión globales.
+- **Qué hacemos:** acotar
+- **Qué cambiamos y en qué equipo:** En el `Router-operadora`, modificar las reglas de Destination NAT (Port Forwarding) del FTP, añadiendo el parámetro `src-address=192.168.122.50` para que solo la Asesoría Fiscal pueda alcanzar el servidor FTP interno. Se cerrarán servicios de administración del router (`Telnet`, `Winbox`, `API`) hacia la WAN.
+- **A quién afecta:** A atacantes externos. La Asesoría Fiscal no notará ningún cambio, ya que su IP está permitida.
+- **Cómo comprobaremos que protege y que la gestoría sigue trabajando:** Escanear la IP pública del router desde una IP externa distinta a la de la asesoría y confirmar que el puerto 21 aparece como filtrado/cerrado.
 
-### Medida: Limitar privilegios de las cuentas del servidor
-- Qué problema resuelve y cómo lo sabemos: `becario` tiene `NOPASSWD: ALL` en `/etc/sudoers.d/becario`, lo que permite ejecutar acciones administrativas sin contraseña. También existe una cuenta compartida `asesores` con shell.
-- Qué hacemos: acotar
-- Qué cambiamos y en qué equipo: Revisar los permisos de `sudo` y retirar a `becario` la directiva `NOPASSWD: ALL`, confirmando antes con la jefa qué tareas técnicas necesita realizar. Valorar sustituir la cuenta compartida por cuentas personales, si la gestoría puede trabajar de esa forma.
-- A quién afecta: A `becario`, a los asesores, a las personas administradoras y a quienes acceden a los documentos del servidor.
-- Cómo comprobaremos que protege y que la gestoría sigue trabajando: Probar qué permisos conserva cada cuenta y confirmar que las personas autorizadas siguen realizando sus tareas. Pendiente: preguntar a la jefa qué tareas requieren privilegios administrativos y si se pueden crear cuentas individuales.
+### Medida: Eliminar la cuenta del becario y limitar privilegios
+- **Qué problema resuelve y cómo lo sabemos:** El usuario `becario` tiene `NOPASSWD: ALL` en `/etc/sudoers.d/becario`, otorgando acceso root sin restricciones. Existe una cuenta compartida "asesores".
+- **Qué hacemos:** quitar y acotar
+- **Qué cambiamos y en qué equipo:** En el servidor, se eliminará permanentemente la cuenta del `becario` (`userdel -r becario`) por suponer una brecha de seguridad inaceptable y no ser necesaria para la producción. Se sustituirá la cuenta compartida por cuentas individuales estándar.
+- **A quién afecta:** A quien usara la cuenta del becario y a la plantilla, que usará cuentas propias.
+- **Cómo comprobaremos que protege y que la gestoría sigue trabajando:** Ejecutar `id becario` para confirmar que no existe. Revisar `/etc/sudoers.d/` para asegurar que no hay archivos residuales.
 
 ### Medida: Comprobar las protecciones del sistema y confinar un servicio
-- Qué problema resuelve y cómo lo sabemos: El servidor ejecuta Ubuntu 24.04.5 y tiene servicios accesibles desde la red, pero el diagnóstico no indica qué protecciones del sistema están activas ni si algún servicio está confinado.
-- Qué hacemos: endurecer
-- Qué cambiamos y en qué equipo: Registrar el estado inicial de las protecciones del sistema y cerrar de forma permanente las que estén abiertas y no sean necesarias. Confinar un servicio expuesto, por ejemplo nginx si se confirma que la gestoría lo necesita, mediante AppArmor o las opciones de aislamiento de systemd.
-- A quién afecta: A las personas que usan el servicio confinado, a la gestoría y a quien administre el servidor.
-- Cómo comprobaremos que protege y que la gestoría sigue trabajando: Guardar el estado anterior y posterior, reiniciar y comprobar que los cambios persisten. Probar que el servicio queda bloqueado al intentar una acción que no debería poder realizar y verificar que su función legítima sigue funcionando. Pendiente: confirmar qué necesita hacer nginx y elegir una prueba segura.
+- **Qué problema resuelve y cómo lo sabemos:** El diagnóstico no indica protecciones activas ni confinamiento de servicios clave.
+- **Qué hacemos:** endurecer
+- **Qué cambiamos y en qué equipo:** Activar protecciones del núcleo en `/etc/sysctl.conf` (ej. ocultar punteros del kernel). Confinar el servicio Samba (`smbd.service`) mediante directivas de systemd (`ProtectSystem=strict`, `ProtectHome=read-only`).
+- **A quién afecta:** Transparente para la gestoría.
+- **Cómo comprobaremos que protege y que la gestoría sigue trabajando:** Ejecutar `systemd-analyze security smbd` antes y después de aplicar la medida para evidenciar la reducción matemática del nivel de exposición.
 
 # 3. LAS 4 MOLESTIAS
 
-1. Eliminación del acceso de invitado a Samba. Se retirará el acceso sin contraseña a la carpeta de clientes. La cuenta compartida `asesores` se revisará, pero su sustitución por cuentas personales queda pendiente de confirmar.
+1. **Autenticación personal en Samba (Fin del acceso de invitado/compartido).** Se retirará el acceso libre a la carpeta de clientes y se eliminará la cuenta compartida.
+   - **A quién afecta:** A toda la plantilla de asesores que accede diariamente al servidor.
+   - **Por qué merece la pena:** Permite la trazabilidad exigida por la auditoría y asegura que solo el personal autorizado accede a la información tributaria.
 
-- A quién afecta: A toda la plantilla de asesores que accede diariamente al servidor.
+2. **Protección del arranque en BIOS/UEFI.** Se establece contraseña administrativa para acceder al setup o menú de arranque.
+   - **A quién afecta:** Al soporte técnico o a cualquiera que intente usar dispositivos de arranque externos.
+   - **Por qué merece la pena:** Dificulta la manipulación del orden de arranque para eludir la seguridad del SO instalado.
 
-- Por qué merece la pena: Reduce el riesgo de que alguien que llegue al servicio Samba acceda o modifique los documentos sin autenticarse. Mientras exista una cuenta compartida, no se podrá atribuir con certeza cada acción a una persona concreta.
+3. **Cifrado de disco (LUKS) en portátil y servidor.** Requerirá introducir una clave de desbloqueo criptográfico antes de que cargue el sistema operativo (en el portátil) o montar el volumen de datos (en el servidor).
+   - **A quién afecta:** A Laura (al encender su portátil) y a la jefa/administrador (al reiniciar el servidor físicamente).
+   - **Por qué merece la pena:** Es la única garantía técnica que cumple el requisito de que "si nos roban otro portátil [o los discos del servidor], nadie puede leer lo que hay dentro".
 
-
-2. Protección del arranque del portátil. Se revisará la configuración BIOS/UEFI y, si es posible, se establecerá una contraseña administrativa y se impedirá el arranque desde medios externos no autorizados. El diagnóstico no confirma cuál es la configuración actual.
-
-- A quién afecta: A Laura y a cualquier miembro del equipo que deba llevarse el portátil corporativo fuera de la oficina.
-- Por qué merece la pena: Dificulta que una persona no autorizada cambie la configuración de arranque o inicie otro sistema operativo. No impide por sí sola extraer los datos del disco; para protegerlos frente a ese riesgo se necesita cifrado.
-
-
-3. Fin de las ejecuciones de administrador sin contraseña
-Derivado de la limitación de privilegios en el servidor, se propone retirar a `becario` la directiva `NOPASSWD: ALL`, tras confirmar qué tareas técnicas necesita realizar.
-
-- A quién afecta: Al becario y a cualquier otra persona que realice tareas técnicas en el servidor.
-- Por qué merece la pena: Si la cuenta del becario es vulnerada o deja su sesión abierta, un atacante no podrá tomar el control total del servidor de forma automática y silenciosa, conteniendo el impacto de una brecha.
-
-
-4. Revisión del intercambio de archivos con la asesoría fiscal. Se comprobará si el FTP está cifrado y si la asesoría lo necesita. Si se decide cerrarlo, primero se acordará una alternativa que permita mantener el intercambio de archivos.
-
-- A quién afecta: Al personal de Mareas Asesores que necesite compartir documentación con la asesoría externa, y a la propia asesoría.
-
-- Por qué merece la pena: Si se confirma que el FTP transmite datos o credenciales sin cifrar, sustituirlo o protegerlo reducirá el riesgo de interceptación. No se cerrará la redirección antes de acordar cómo continuará el intercambio necesario.
-
+4. **Despliegue de VLANs y segmentación estricta.** La separación física y lógica obliga a los equipos a pasar por el firewall del router para comunicarse.
+   - **A quién afecta:** A quien administre la red (al tener que mantener el enrutamiento y las reglas).
+   - **Por qué merece la pena:** Evita que un malware en un puesto de trabajo comprometa automáticamente al servidor o que un cliente en la sala de espera escanee la red corporativa.
 
 # 4. DOS DESCARTES
 
 **Descarte 1:** Bloqueo de puertos USB de almacenamiento en los puestos de trabajo
+- **Motivo:** No se bloquean las unidades extraíbles mediante GPO de Windows porque se asume (a falta de confirmación) que los clientes pueden aportar documentación fiscal o certificados digitales en memorias USB durante la campaña de la renta.
+- **Riesgo que queda abierto:** Permanece el riesgo de infección por malware introducido físicamente por un asesor o de fuga de datos mediante copia directa a un pendrive personal.
 
-**Motivo:** El diagnóstico no confirma si la gestoría recibe documentos de clientes en memorias USB. Se descarta bloquearlas de forma general porque podría interferir con ese flujo de trabajo; conviene confirmar su uso antes de implantar restricciones.
-
-**Riesgo que queda abierto:** Si se utilizan memorias USB, permanece el riesgo de introducir malware o copiar documentos fuera de la red. Se pueden valorar controles selectivos sin bloquear los usos legítimos.
-
-
-**Descarte 2:** Adquisición de un Firewall UTM (Gestión Unificada de Amenazas) físico
-
-**Motivo:** El cliente estableció como regla innegociable "Sin hardware nuevo". La segmentación de la red de clientes se plantea mediante una VLAN y el filtrado del switch y el router existentes, siempre que estos equipos admitan la configuración necesaria.
-
-**Riesgo que queda abierto:** La red queda protegida por un filtrado básico de capa 3 y 4 (IPs y puertos). Al no disponer de un equipo avanzado, se carece de inspección profunda de paquetes, lo que impide detectar intrusiones sofisticadas o analizar el tráfico en busca de malware antes de que llegue a los equipos.
+**Descarte 2:** Sustitución del FTP externo por SFTP
+- **Motivo:** Modificar el protocolo de FTP a SFTP exigiría que la Asesoría Fiscal externa cambiase sus programas o flujos de trabajo, lo cual vulnera la regla de impacto limitado dictada por el cliente.
+- **Riesgo que queda abierto:** Al mantener FTP, las transferencias entre el servidor y la asesoría siguen viajando sin cifrado. Este riesgo se asume, pero se acota el vector de ataque externo permitiendo la conexión exclusivamente desde la IP estática de la asesoría.
