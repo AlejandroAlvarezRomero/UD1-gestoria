@@ -21,11 +21,11 @@ Finalmente, se habilitará la VLAN 30 para aislar la red inalámbrica que se ofr
 
 Se ha modificado el orden de asignación en la VLAN 10 para garantizar que el servidor reciba la dirección IP más pequeña disponible en su subred.
 
-| Segmento y función | VLAN o interfaz | Red/prefijo | Rango utilizable | Puerta de enlace |
-|---|---|---|---|---|
-| Plantilla Empresa | VLAN20 | 192.168.1.0/26 | 192.168.1.1 - 192.168.1.62 | 192.168.1.62 |
-| Clientes | VLAN30 | 192.168.1.64/26 | 192.168.1.65 - 192.168.1.126 | 192.168.1.126 |
-| Servidor | VLAN10 | 192.168.1.128/28 | **192.168.1.129 (Servidor)** - 192.168.1.141 | 192.168.1.142 |
+| Segmento y función | VLAN | Red / prefijo | Rango utilizable | Puerta de enlace (Gateway) |
+| --- | --- | --- | --- | --- |
+| Servidores y Gestión | VLAN 10 | 192.168.1.0/28 | 192.168.1.1 - 192.168.1.14 | 192.168.1.1 |
+| Empleados (Plantilla) | VLAN 20 | 192.168.1.64/26 | 192.168.1.65 - 192.168.1.126 | 192.168.1.65 |
+| Clientes (WiFi) | VLAN 30 | 192.168.1.128/26 | 192.168.1.129 - 192.168.1.190 | 192.168.1.129 |
 
 <br>
 
