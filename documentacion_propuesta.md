@@ -193,5 +193,64 @@ netsh interface ipv4 set address name="Ethernet" static 192.168.1.69 255.255.255
 netsh interface ipv4 set address name="Ethernet" static 192.168.1.70 255.255.255.192 192.168.1.65
 
 
+## 4. Bastionado Perimetral y Control de Acceso en el Router (MikroTik)
 
+**Dónde se aplica:** Consola del equipo `Router-operadora`.
+
+### 4.1 Permisos de Tráfico NAT y Estado en el Cortafuegos
+
+Se añaden reglas de control de estado en la cadena `forward` del firewall para garantizar que las conexiones legítimas establecidas y el tráfico redirigido mediante NAT hacia el servidor FTP puedan fluir sin ser bloqueados por las políticas de aislamiento entre VLANs.
+
+```routeros
+/ip firewall filter
+add chain=forward connection-state=established,related action=accept place-before=0 comment="Permitir trafico establecido"
+add chain=forward connection-nat-state=dstnat action=accept place-before=1 comment="Permitir trafico redirigido por NAT (FTP Asesoria)"
+```
+
+* **Explicación:** Al colocar estas reglas al inicio de la cadena `forward`, el router permite el paso de paquetes pertenecientes a sesiones ya autorizadas y al reenvío de puertos de la Asesoría Fiscal (`dstnat`), manteniendo intacto el bloqueo hacia el resto de intentos de conexión no solicitados.
+
+### 4.2 Deshabilitación de Servicios Inseguros y Acotación de Gestión
+
+Se desactivan los servicios de administración propios del router que transmiten información en texto claro o no son necesarios, y se restringe el acceso a los servicios de gestión activos exclusivamente a las subredes de servidores (`VLAN 10`) y plantilla (`VLAN 20`).
+
+```routeros
+/ip service
+disable telnet
+disable ftp
+disable api
+disable api-ssl
+set www address=192.168.1.0/28,192.168.1.64/26
+set ssh address=192.168.1.0/28,192.168.1.64/26
+set winbox address=192.168.1.0/28,192.168.1.64/26
+```
+
+* **Explicación:** Deshabilitar el servicio `ftp` interno del MikroTik evita conflictos con la redirección NAT del puerto 21 hacia el servidor Ubuntu y protege al router frente a ataques de fuerza bruta. Asimismo, limitar `www`, `ssh` y `winbox` a `192.168.1.0/28` y `192.168.1.64/26` impide que tanto atacantes externos desde Internet (`ether1`) como clientes conectados en la sala de espera (`VLAN 30 - 192.168.1.128/26`) puedan alcanzar las interfaces de administración del router.
+
+---
+
+## 5. Verificación de la Seguridad Perimetral (FTP Acotado)
+
+**Dónde se aplica:** Consola del equipo externo `Asesoria-fiscal` (`192.168.122.50`).
+
+### 5.1 Prueba de Acceso Autorizado (Asesoría Fiscal)
+
+Se verifica que la Asesoría Fiscal externa mantiene operativa la comunicación con el servicio `vsftpd` del servidor interno a través de la IP WAN del router (`192.168.122.20`).
+
+```bash
+curl -v telnet://192.168.122.20:21
+```
+
+* **Resultado:** Conexión establecida correctamente con respuesta del banner del servidor (`220 (vsFTPd 3.0.5)`), confirmando que la operativa diaria de intercambio de archivos no se ve interrumpida.
+
+### 5.2 Prueba de Bloqueo a Terceros Externos No Autorizados
+
+Se asigna temporalmente una dirección IP secundaria (`192.168.122.99`) en la interfaz externa para simular un intento de intrusión desde cualquier otro origen de Internet distinto a la Asesoría Fiscal.
+
+```bash
+ip addr add 192.168.122.99/24 dev eth0
+curl --interface 192.168.122.99 -m 3 -v telnet://192.168.122.20:21
+ip addr del 192.168.122.99/24 dev eth0
+```
+
+* **Resultado:** Conexión rechazada (`Connection refused` / `Failed to connect to 192.168.122.20 port 21`), demostrando que el servicio FTP permanece cerrado e inaccesible para cualquier equipo externo cuya IP no coincida con la regla `src-address=192.168.122.50`.
 ---
