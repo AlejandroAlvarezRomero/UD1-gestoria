@@ -1,16 +1,16 @@
 # Memoria Técnica de Implantación: Segmentación de Red y Seguridad
 
-Este documento detalla los comandos y configuraciones aplicados durante la fase de implantación del proyecto en GNS3.
+Este documento detalla los comandos y configuraciones aplicados durante la fase de implantación del proyecto en GNS3 para la infraestructura de **Mareas Asesores**.
 
 ---
 
-## 1. Configuración del Switch de Acceso 
+## 1. Configuración del Switch de Acceso
 **Dónde se aplica:** Consola del equipo `Switch-oficina`.
 
 ### 1.1 Creación de VLANs
 Se definen tres dominios de difusión independientes para aislar el tráfico por departamentos.
 
-
+```cisco
 enable
 configure terminal
 
@@ -21,32 +21,34 @@ vlan 20
 vlan 30
  name CLIENTES
 exit
+```
 
-* **Explicación:** Separar la red lógicamente impide que un equipo comprometido en la sala de clientes (VLAN 30) pueda interceptar el tráfico de los empleados (VLAN 20) o atacar directamente al servidor (VLAN 10) mediante técnicas de Capa 2 (como ARP Spoofing).
+* **Explicación:** Separar la red lógicamente impide que un equipo comprometido en la sala de clientes (VLAN 30) pueda interceptar el tráfico de los empleados (VLAN 20) o atacar directamente al servidor (VLAN 10) mediante técnicas de Capa 2 (como *ARP Spoofing*).
 
 ### 1.2 Configuración del Enlace Troncal (Trunk)
 El puerto que conecta con el router debe permitir el paso de todas las VLANs.
 
-
+```cisco
 interface g0/0
  switchport trunk encapsulation dot1q
  switchport mode trunk
  switchport trunk allowed vlan 10,20,30
  exit
+```
 
-* **Explicación:** Se configura el puerto en modo `trunk` con encapsulación 802.1Q. Esto etiqueta las tramas Ethernet indicando a qué VLAN pertenecen antes de enviarlas al router, permitiendo que un solo cable físico transporte múltiples redes lógicas ("Router-on-a-stick").
+* **Explicación:** Se configura el puerto en modo `trunk` con encapsulación 802.1Q. Esto etiqueta las tramas Ethernet indicando a qué VLAN pertenecen antes de enviarlas al router, permitiendo que un solo cable físico transporte múltiples redes lógicas (*Router-on-a-stick*).
 
 ### 1.3 Asignación de Puertos de Acceso
-Se asignan los puertos físicos a sus respectivas VLANs de forma estática.
+Se asignan los puertos físicos a sus respectivas VLANs de forma estática y se guarda la configuración en memoria permanente.
 
-
- Servidor (VLAN 10)
+```cisco
+! Servidor (VLAN 10)
 interface g0/1
  switchport mode access
  switchport access vlan 10
  exit
 
- Empleados e impresoras (VLAN 20)
+! Empleados e impresoras (VLAN 20)
 interface g0/2
  switchport mode access
  switchport access vlan 20
@@ -64,15 +66,16 @@ interface g1/2
  switchport access vlan 20
  exit
 
- AP Clientes (VLAN 30)
+! AP Clientes (VLAN 30)
 interface g1/3
  switchport mode access
  switchport access vlan 30
  exit
 
- Guardar configuración
+! Guardar configuración
 exit
 write memory
+```
 
 ---
 
@@ -80,66 +83,83 @@ write memory
 **Dónde se aplica:** Consola del equipo `Router-operadora`.
 
 ### 2.1 Limpieza y Enrutamiento Inter-VLAN
-Se retira la IP de la antigua red plana y se configuran las puertas de enlace (Gateways) virtuales.
+Tras el reinicio del nodo en GNS3, las interfaces activas del router corresponden a `ether6` (enlace exterior/WAN) y `ether7` (enlace troncal hacia `Gi0/0` del switch). Se retira la antigua red plana y se configuran las puertas de enlace virtuales.
 
+```routeros
+# 1. Eliminar la red antigua del puerto físico huérfano
+/ip address remove [find dynamic=no]
 
- 1. Eliminar la red antigua del puerto físico
-/ip address remove 0
-
- 2. Crear las interfaces virtuales VLAN en el cable que va al switch (ether2)
+# 2. Crear las interfaces virtuales VLAN en el enlace troncal (ether7)
 /interface vlan
-add interface=ether2 name=vlan10 vlan-id=10
-add interface=ether2 name=vlan20 vlan-id=20
-add interface=ether2 name=vlan30 vlan-id=30
+add interface=ether7 name=vlan10 vlan-id=10
+add interface=ether7 name=vlan20 vlan-id=20
+add interface=ether7 name=vlan30 vlan-id=30
 
- 3. Asignar las direcciones IP calculadas por VLSM
+# 3. Asignar las direcciones IP calculadas por VLSM
 /ip address
 add address=192.168.1.1/28 interface=vlan10
 add address=192.168.1.65/26 interface=vlan20
 add address=192.168.1.129/26 interface=vlan30
 
-* **Explicación VLSM:** Se ajustan las máscaras (`/28` para servidores y /26 para el resto) para no desperdiciar direcciones IP, ciñendo el tamaño de cada subred a sus necesidades reales de hosts.
+# 4. Reasignar el cliente DHCP a la interfaz exterior activa (ether6)
+/ip dhcp-client set [find] interface=ether6
+/ip dhcp-client enable [find]
+```
 
-### 2.2 Seguridad Perimetral: NAT Acotado (FTP)
-Se permite el acceso desde el exterior para la Asesoría Fiscal, pero de forma restrictiva.
+* **Explicación VLSM:** Se ajustan las máscaras (`/28` para servidores y `/26` para el resto) para no desperdiciar direcciones IP, ciñendo el tamaño de cada subred a sus necesidades reales de *hosts*.
 
+### 2.2 Seguridad Perimetral: NAT y Acceso FTP Acotado
+Se actualiza la salida a Internet (`masquerade`) sobre `ether6` (IP dinámica asignada: `192.168.122.51/24`) y se restringe el acceso FTP desde el exterior exclusivamente a la IP de la Asesoría Fiscal.
 
+```routeros
 /ip firewall nat
-add action=dst-nat chain=dstnat dst-port=21 in-interface=ether1 protocol=tcp src-address=192.168.122.50 to-addresses=192.168.1.10
-add action=dst-nat chain=dstnat dst-port=40000-40050 in-interface=ether1 protocol=tcp src-address=192.168.122.50 to-addresses=192.168.1.10
+set 0 out-interface=ether6
+set 1,2 in-interface=ether6 src-address=192.168.122.50
+```
 
-* **Explicación:** En lugar de abrir el puerto 21 a todo Internet (lo que expondría el servidor a ataques de fuerza bruta constantes), la regla obliga a que la petición provenga exclusivamente de la IP origen `192.168.122.50` (Asesoría Fiscal). Si un atacante intenta conectar desde otra IP, el router ignorará la petición. El rango 40000-40050 se abre para permitir la transferencia de datos del protocolo FTP en modo pasivo.
+*(En caso de crear las reglas desde cero sobre `ether6`:)*
+
+```routeros
+/ip firewall nat
+add action=masquerade chain=srcnat out-interface=ether6
+add action=dst-nat chain=dstnat comment="FTP-asesoria" dst-port=21 in-interface=ether6 protocol=tcp src-address=192.168.122.50 to-addresses=192.168.1.10
+add action=dst-nat chain=dstnat comment="FTP-pasivo-asesoria" dst-port=40000-40050 in-interface=ether6 protocol=tcp src-address=192.168.122.50 to-addresses=192.168.1.10
+```
+
+* **Explicación:** En lugar de abrir el puerto 21 a todo Internet, la regla obliga a que la petición provenga exclusivamente de la IP origen `192.168.122.50` (Asesoría Fiscal). Si un atacante intenta conectar desde otra IP, el router ignorará la petición. El rango `40000-40050` permite la transferencia de datos del protocolo FTP en modo pasivo.
 
 ### 2.3 Políticas de Cortafuegos (Firewall Filter)
-Se aplican las reglas de aislamiento interno.
+Se aplican las reglas de aislamiento interno entre VLANs en orden estricto de evaluación.
 
-
+```routeros
 /ip firewall filter
- Permitir tráfico de empleados a servidor solo por HTTP y Samba
+# Permitir tráfico de empleados a servidor solo por HTTP (80) y Samba (445)
 add action=accept chain=forward dst-port=80,445 in-interface=vlan20 out-interface=vlan10 protocol=tcp
 
- Bloquear cualquier otro intento desde empleados hacia servidor
+# Bloquear cualquier otro intento desde empleados hacia servidor (incluido ICMP/ping)
 add action=drop chain=forward in-interface=vlan20 out-interface=vlan10
 
- Bloquear tráfico desde clientes WiFi hacia servidor y empleados
+# Bloquear tráfico desde clientes WiFi hacia servidor y empleados
 add action=drop chain=forward in-interface=vlan30 out-interface=vlan10
 add action=drop chain=forward in-interface=vlan30 out-interface=vlan20
-
+```
 
 ---
 
 ## 3. Configuración de Equipos Finales
 
 ### 3.1 Servidor Ubuntu (`srv-mareas`)
-**Dónde se aplica:** Terminal de Linux de `srv-mareas`.
+**Dónde se aplica:** Terminal de Linux de `srv-mareas` (VLAN 10).
 
-Se configura Netplan para hacer permanente la nueva máscara y puerta de enlace.
+Se configura Netplan para hacer permanente la nueva máscara `/28` y la puerta de enlace.
 
-bash
+```bash
 sudo nano /etc/netplan/01-gestoria.yaml
+```
 
 **Contenido del archivo:**
-yaml
+
+```yaml
 network:
   version: 2
   ethernets:
@@ -151,47 +171,63 @@ network:
           via: 192.168.1.1
       nameservers:
         addresses: [8.8.8.8, 1.1.1.1]
+```
 
-bash
+```bash
 sudo netplan apply
-
+```
 
 ### 3.2 Equipos Ligeros (VPCS)
-**Dónde se aplica:** Consolas respectivas de `Movil-cliente`, `Impresora-1`, `Impresora-2`.
+**Dónde se aplica:** Consolas respectivas de `Movil-cliente`, `Impresora-1` e `Impresora-2`.
 
 Se asigna IP, máscara y gateway, y se guardan en la memoria flash virtual.
 
-text
- Movil-cliente (VLAN 30)
+```text
+# Movil-cliente (VLAN 30)
 ip 192.168.1.130 255.255.255.192 192.168.1.129
 save
 
- Impresora-1 (VLAN 20)
+# Impresora-1 (VLAN 20)
 ip 192.168.1.66 255.255.255.192 192.168.1.65
 save
 
- Impresora-2 (VLAN 20)
+# Impresora-2 (VLAN 20)
 ip 192.168.1.67 255.255.255.192 192.168.1.65
 save
+```
 
+### 3.3 Equipos de Escritorio (VLAN 20)
+**Dónde se aplica:** Configuración de red de `Portatil` (Ubuntu Desktop) y puestos Windows (`Puesto-1`, `Puesto-2`).
 
-### 3.3 Equipos de Escritorio
-**Dónde se aplica:** Terminal de Linux (`Portatil`) y CMD como Administrador (`Puesto-1`, `Puesto-2`).
+* **`Portatil` (Ubuntu Desktop — NetworkManager IPv4 Manual):**
+  Se configura de forma persistente desde el gestor de red gráfico (`ens3`) para evitar sobrescrituras del servicio de red:
+  * **Dirección IP:** `192.168.1.68`
+  * **Máscara de red:** `255.255.255.192` (`/26`)
+  * **Puerta de enlace:** `192.168.1.65`
 
-bash
- Portatil (Linux)
-sudo ip addr flush dev ens3
-sudo ip addr add 192.168.1.68/26 dev ens3
-sudo ip route add default via 192.168.1.65
+* **Puestos Windows (`Puesto-1` y `Puesto-2` — CMD como Administrador / `ncpa.cpl`):**
 
-
-cmd
- Puesto-1 (Windows)
+```cmd
+:: Puesto-1 (Windows)
 netsh interface ipv4 set address name="Ethernet" static 192.168.1.69 255.255.255.192 192.168.1.65
 
- Puesto-2 (Windows)
+:: Puesto-2 (Windows)
 netsh interface ipv4 set address name="Ethernet" static 192.168.1.70 255.255.255.192 192.168.1.65
+```
 
+---
+
+## Verificación y Pruebas de Funcionamiento
+
+Se validan las políticas de segmentación y filtrado mediante pruebas reales en la topología:
+
+1. **Verificación de VLANs y Troncal (`Switch-oficina`):** `show vlan brief` confirma las VLANs `10`, `20` y `30` activas con sus respectivos puertos asignados y `Gi0/0` operando en modo *trunk*.
+2. **Conectividad base del servidor (`srv-mareas`):** `ip a show ens3` muestra `192.168.1.10/28` y `ping 192.168.1.1` responde con `0% packet loss`.
+3. **Filtrado selectivo Plantilla $\rightarrow$ Servidor (`Portatil`):**
+   * `ping 192.168.1.65` responde sin pérdida de paquetes (conectividad con su gateway).
+   * `ping 192.168.1.10` devuelve `100% packet loss` (el router bloquea el tráfico ICMP no autorizado hacia servidores).
+   * El acceso mediante navegador web a `[http://192.168.1.10](http://192.168.1.10)` carga correctamente la página del servidor **Nginx**, verificando el paso permitido por el puerto TCP `80`.
+4. **Aislamiento de Invitados (`Movil-cliente`):** `ping 192.168.1.129` responde dentro de la VLAN 30, mientras que `ping 192.168.1.10` es descartado por el cortafuegos.
 
 ## 4. Bastionado Perimetral y Control de Acceso en el Router (MikroTik)
 
