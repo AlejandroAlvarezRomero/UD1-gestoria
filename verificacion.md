@@ -306,7 +306,7 @@ ip addr del 192.168.122.99/24 dev eth0
 
 La conexión desde la IP no autorizada fue rechazada. La dirección temporal `192.168.122.99` se retiró al terminar la prueba. Esto verifica el bloqueo desde otro origen en la WAN simulada, no desde cualquier punto de Internet.
 
-### 5.3 Prueba de listado FTP en modo pasivo (pendiente de credenciales válidas)
+### 5.3 Prueba de listado FTP en modo pasivo (no verificada)
 
 Se intentó obtener el listado del directorio FTP en modo pasivo desde `Asesoria-fiscal`:
 
@@ -314,7 +314,9 @@ Se intentó obtener el listado del directorio FTP en modo pasivo desde `Asesoria
 curl -v --ftp-pasv --user asesoriafiscal ftp://192.168.122.51/
 ```
 
-El servidor respondió al puerto de control, pero rechazó el inicio de sesión con `530 Login incorrect`. Al no disponerse de credenciales válidas, no se pudo comprobar el listado ni la transferencia de datos por el canal pasivo. Repetir la prueba con una cuenta autorizada; no incluir la contraseña en el repositorio ni en las capturas.
+El servidor respondió al puerto de control, pero rechazó el inicio de sesión con `530 Login incorrect`. Al no disponerse de credenciales válidas, no se pudo comprobar el listado ni la transferencia de datos por el canal pasivo.
+
+**Estado:** no verificado. No incluir contraseñas en el repositorio ni en las capturas.
 ---
 
 ## 6. Evidencias de la configuración de VLAN y del router
