@@ -230,33 +230,55 @@ set winbox address=192.168.1.0/28,192.168.1.64/26
 
 ## 5. Verificación de la Seguridad Perimetral (FTP Acotado)
 
-**Dónde se aplica:** Consola del equipo externo `Asesoria-fiscal` (`192.168.122.50`).
+**Dónde se aplica:** Consola del equipo `Asesoria-fiscal` (`192.168.122.50`), conectado a la red WAN simulada.
 
 ### 5.1 Prueba de Acceso Autorizado (Asesoría Fiscal)
 
-Se verifica que la Asesoría Fiscal externa mantiene operativa la comunicación con el servicio `vsftpd` del servidor interno a través de la IP WAN del router (`192.168.122.20`).
+Se comprueba que la Asesoría Fiscal puede alcanzar el puerto de control FTP del servidor a través de la IP WAN actual del router (`192.168.122.51`).
 
 ```bash
-curl -v telnet://192.168.122.20:21
+curl -v telnet://192.168.122.51:21
 ```
 
-* **Resultado:** Conexión establecida correctamente con respuesta del banner del servidor (`220 (vsFTPd 3.0.5)`), confirmando que la operativa diaria de intercambio de archivos no se ve interrumpida.
+**Resultado obtenido:**
 
-![Prueba FTP autorizada desde la Asesoría Fiscal](Images/ftp-acceso-autorizado.png)
+```text
+* Trying 192.168.122.51:21...
+* Connected to 192.168.122.51 (192.168.122.51) port 21
+220 (vsFTPd 3.0.5)
+```
 
-### 5.2 Prueba de Bloqueo a Terceros Externos No Autorizados
+La conexión desde la IP autorizada llega al puerto TCP/21 y recibe el banner de `vsftpd`. Esta prueba confirma el canal de control, pero no verifica el inicio de sesión ni la transferencia de archivos por el canal pasivo.
 
-Se asigna temporalmente una dirección IP secundaria (`192.168.122.99`) en la interfaz externa para simular un intento de intrusión desde cualquier otro origen de Internet distinto a la Asesoría Fiscal.
+### 5.2 Prueba de Bloqueo a una IP no autorizada
+
+Desde `Asesoria-fiscal` se asignó temporalmente `192.168.122.99` a `eth0` para probar el acceso desde una IP distinta de la autorizada. La prueba se dirigió a la IP WAN actual del router (`192.168.122.51`).
 
 ```bash
 ip addr add 192.168.122.99/24 dev eth0
-curl --interface 192.168.122.99 -m 3 -v telnet://192.168.122.20:21
+curl --interface 192.168.122.99 -m 3 -v telnet://192.168.122.51:21
 ip addr del 192.168.122.99/24 dev eth0
 ```
 
-* **Resultado:** Conexión rechazada (`Connection refused` / `Failed to connect to 192.168.122.20 port 21`), demostrando que el servicio FTP permanece cerrado e inaccesible para cualquier equipo externo cuya IP no coincida con la regla `src-address=192.168.122.50`.
+**Resultado obtenido:**
 
-![Prueba FTP bloqueada desde una IP no autorizada](Images/ftp-acceso-bloqueado.png)
+```text
+* Trying 192.168.122.51:21...
+* connect to 192.168.122.51 port 21 from 192.168.122.99 failed: Connection refused
+* Failed to connect to 192.168.122.51 port 21
+```
+
+La conexión desde la IP no autorizada fue rechazada. La dirección temporal `192.168.122.99` se retiró al terminar la prueba. Esto verifica el bloqueo desde otro origen en la WAN simulada, no desde cualquier punto de Internet.
+
+### 5.3 Prueba de listado FTP en modo pasivo (pendiente de credenciales válidas)
+
+Se intentó obtener el listado del directorio FTP en modo pasivo desde `Asesoria-fiscal`:
+
+```bash
+curl -v --ftp-pasv --user asesoriafiscal ftp://192.168.122.51/
+```
+
+El servidor respondió al puerto de control, pero rechazó el inicio de sesión con `530 Login incorrect`. Al no disponerse de credenciales válidas, no se pudo comprobar el listado ni la transferencia de datos por el canal pasivo. Repetir la prueba con una cuenta autorizada; no incluir la contraseña en el repositorio ni en las capturas.
 ---
 
 ## 6. Evidencias de la configuración de VLAN y del router
@@ -293,20 +315,16 @@ show interfaces trunk
 
 **Resultado observado:**
 
-- La regla de `masquerade` proporciona NAT de salida por `ether1`.
-- Hay una regla Destination NAT TCP para el puerto 21 hacia `192.168.1.10`, limitada a conexiones entrantes por `ether1` cuyo origen es `192.168.122.50`.
+- La regla de `masquerade` proporciona NAT de salida por `ether6`.
+- Hay una regla Destination NAT TCP para el puerto 21 hacia `192.168.1.10`, limitada a conexiones entrantes por `ether6` cuyo origen es `192.168.122.50`.
 - Hay otra regla equivalente para el rango TCP `40000-40050`, también limitada a `192.168.122.50`.
 - La primera regla de `forward` acepta conexiones `established,related`.
 - Se permite desde `vlan20` hacia `vlan10` el tráfico TCP a los puertos 80 y 445.
-- Se permite el tráfico con estado `dstnat`; las reglas NAT mostradas limitan las redirecciones FTP a la IP autorizada.
+- Se permite el tráfico FTP redirigido desde `ether6` hacia `192.168.1.10` solo desde `192.168.122.50`, por TCP/21 y TCP/40000-40050.
 - Se descarta el resto del tráfico de `vlan20` hacia `vlan10` y el tráfico de `vlan30` hacia `vlan10` y `vlan20`.
+- No aparece una regla de descarte general al final de la cadena `forward`; el tráfico que no coincide con estas reglas no queda bloqueado por ellas.
 
-**Conclusión:** La salida confirma las reglas configuradas. La prueba de acceso autorizado y la prueba desde otra IP están descritas en la sección 5.
-
-**Observación:** La regla `connection-nat-state=dstnat` no especifica destino ni puerto. Actualmente depende de que las reglas Destination NAT estén restringidas correctamente; si se añaden nuevas redirecciones, hay que revisar que no se permita tráfico no previsto.
-
-![Reglas NAT del router](Images/ftp-nat-router.png)
-![Reglas de firewall del router](Images/ftp-firewall-router.png)
+**Conclusión:** Las redirecciones NAT y la aceptación del tráfico FTP están limitadas a la IP de la asesoría. La prueba de acceso autorizado al puerto 21 aparece en la sección 5.1; la prueba desde otra IP sigue pendiente.
 
 ### 6.3 Servicios de administración del router
 
@@ -321,7 +339,7 @@ show interfaces trunk
 - Deshabilitados: Telnet, FTP, WWW-SSL, API y API-SSL.
 - Activos y limitados a `192.168.1.0/28` y `192.168.1.64/26`: WWW, SSH y Winbox.
 
-**Conclusión:** La salida confirma que los servicios de administración activos están limitados a las redes de servidores/gestión y plantilla. No muestra por sí sola el resultado de intentos de conexión desde VLAN 30 o desde la red externa.
+**Conclusión:** La salida actual confirma que los servicios inseguros o no necesarios están deshabilitados y que los servicios de gestión activos se limitan a las VLAN 10 y 20. La prueba de acceso desde una red no permitida sigue pendiente.
 
 ![Servicios del router y rangos de administración permitidos](Images/ftp-servicios-router.png)
 
@@ -334,3 +352,21 @@ Las salidas anteriores verifican la configuración, no la conectividad efectiva 
 - Desde VLAN 30 y desde la red externa, que no se puede administrar el router por WWW, SSH o Winbox.
 
 Añadir el equipo de origen, el destino, el comando usado y el resultado observado para cada prueba realizada.
+
+## 7. Eliminación de la cuenta `becario`
+
+**Dónde se aplica:** Servidor `srv-mareas`.
+
+**Comprobaciones realizadas:**
+
+```text
+id becario
+id: becario: no such user
+
+ls /etc/sudoers.d
+README
+```
+
+**Resultado:** La cuenta `becario` ya no existe y no aparece un archivo `becario` en `/etc/sudoers.d`.
+
+**Comprobación pendiente:** ejecutar `sudo visudo -c` para validar la sintaxis completa de sudoers. No se incluye un resultado porque el comando no se pudo ejecutar.
