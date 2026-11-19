@@ -254,3 +254,74 @@ ip addr del 192.168.122.99/24 dev eth0
 
 * **Resultado:** Conexión rechazada (`Connection refused` / `Failed to connect to 192.168.122.20 port 21`), demostrando que el servicio FTP permanece cerrado e inaccesible para cualquier equipo externo cuya IP no coincida con la regla `src-address=192.168.122.50`.
 ---
+
+## 6. Evidencias de la configuración de VLAN y del router
+
+Las siguientes salidas de configuración fueron facilitadas por Hugo desde el laboratorio. Confirman la configuración mostrada, pero por sí solas no demuestran que todas las comunicaciones permitidas y bloqueadas funcionen; esas pruebas de conectividad se indican como pendientes al final de esta sección.
+
+### 6.1 VLAN y puertos del switch
+
+**Comandos ejecutados en `Switch-oficina`:**
+
+```text
+show vlan brief
+show interfaces trunk
+```
+
+**Resultado observado:**
+
+- VLAN 10 `SERVIDORES`, activa en `Gi0/1`.
+- VLAN 20 `PLANTILLA`, activa en `Gi0/2`, `Gi0/3`, `Gi1/0`, `Gi1/1` y `Gi1/2`.
+- VLAN 30 `CLIENTES`, activa en `Gi1/3`.
+- `Gi0/0` está en modo trunk con encapsulación 802.1Q.
+- El trunk permite las VLAN 10, 20 y 30, que aparecen activas y en estado de reenvío.
+
+**Conclusión:** La salida confirma que las VLAN están creadas y que los puertos de acceso y el trunk están asignados según el diseño documentado.
+
+### 6.2 Reglas NAT y de filtrado del router
+
+**Comandos ejecutados en `Router-operadora`:**
+
+```routeros
+/ip firewall nat print detail
+/ip firewall filter print detail
+```
+
+**Resultado observado:**
+
+- La regla de `masquerade` proporciona NAT de salida por `ether1`.
+- Hay una regla Destination NAT TCP para el puerto 21 hacia `192.168.1.10`, limitada a conexiones entrantes por `ether1` cuyo origen es `192.168.122.50`.
+- Hay otra regla equivalente para el rango TCP `40000-40050`, también limitada a `192.168.122.50`.
+- La primera regla de `forward` acepta conexiones `established,related`.
+- Se permite desde `vlan20` hacia `vlan10` el tráfico TCP a los puertos 80 y 445.
+- Se permite el tráfico con estado `dstnat`; las reglas NAT mostradas limitan las redirecciones FTP a la IP autorizada.
+- Se descarta el resto del tráfico de `vlan20` hacia `vlan10` y el tráfico de `vlan30` hacia `vlan10` y `vlan20`.
+
+**Conclusión:** La salida confirma las reglas configuradas. La prueba de acceso autorizado y la prueba desde otra IP están descritas en la sección 5.
+
+**Observación:** La regla `connection-nat-state=dstnat` no especifica destino ni puerto. Actualmente depende de que las reglas Destination NAT estén restringidas correctamente; si se añaden nuevas redirecciones, hay que revisar que no se permita tráfico no previsto.
+
+### 6.3 Servicios de administración del router
+
+**Comando ejecutado en `Router-operadora`:**
+
+```routeros
+/ip service print
+```
+
+**Resultado observado:**
+
+- Deshabilitados: Telnet, FTP, WWW-SSL, API y API-SSL.
+- Activos y limitados a `192.168.1.0/28` y `192.168.1.64/26`: WWW, SSH y Winbox.
+
+**Conclusión:** La salida confirma que los servicios de administración activos están limitados a las redes de servidores/gestión y plantilla. No muestra por sí sola el resultado de intentos de conexión desde VLAN 30 o desde la red externa.
+
+### 6.4 Pruebas de conectividad inter-VLAN pendientes
+
+Las salidas anteriores verifican la configuración, no la conectividad efectiva de los equipos. Falta adjuntar resultados de pruebas que confirmen:
+
+- Desde un equipo de VLAN 30, que no se alcanza el servidor ni un puesto de VLAN 20 y que sí se conserva la salida a Internet.
+- Desde un equipo de VLAN 20, que HTTP y Samba del servidor funcionan y que otros puertos no autorizados están bloqueados.
+- Desde VLAN 30 y desde la red externa, que no se puede administrar el router por WWW, SSH o Winbox.
+
+Añadir el equipo de origen, el destino, el comando usado y el resultado observado para cada prueba realizada.
