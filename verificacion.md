@@ -306,17 +306,30 @@ ip addr del 192.168.122.99/24 dev eth0
 
 La conexión desde la IP no autorizada fue rechazada. La dirección temporal `192.168.122.99` se retiró al terminar la prueba. Esto verifica el bloqueo desde otro origen en la WAN simulada, no desde cualquier punto de Internet.
 
-### 5.3 Prueba de listado FTP en modo pasivo (no verificada)
+### 5.3 Prueba de listado FTP en modo pasivo (verificada)
 
-Se intentó obtener el listado del directorio FTP en modo pasivo desde `Asesoria-fiscal`:
+Se obtuvo el listado del directorio FTP en modo pasivo desde `Asesoria-fiscal`. `curl` solicitó la contraseña de forma interactiva; no se incluye en el comando ni en estas evidencias.
 
 ```bash
 curl -v --ftp-pasv --user asesoriafiscal ftp://192.168.122.51/
 ```
 
-El servidor respondió al puerto de control, pero rechazó el inicio de sesión con `530 Login incorrect`. Al no disponerse de credenciales válidas, no se pudo comprobar el listado ni la transferencia de datos por el canal pasivo.
+**Resultado obtenido:**
 
-**Estado:** no verificado. No incluir contraseñas en el repositorio ni en las capturas.
+```text
+< 220 (vsFTPd 3.0.5)
+< 230 Login successful.
+< 229 Entering Extended Passive Mode (|||40036|)
+> LIST
+-rw-r--r--    1 1005     1005           93 Oct 11 17:49 remesa-2026-semana39.txt
+-rw-r--r--    1 1005     1005           93 Oct 11 17:49 remesa-2026-semana40.txt
+-rw-r--r--    1 1005     1005           93 Oct 11 17:49 remesa-2026-semana41.txt
+< 226 Directory send OK.
+```
+
+El inicio de sesión fue aceptado y el servidor permitió listar el directorio. El puerto pasivo negociado (`40036`) está dentro del rango `40000-40050` configurado en el router, por lo que esta prueba verifica tanto el acceso FTP como el canal de datos pasivo.
+
+**Nota de seguridad:** no incluir contraseñas en el repositorio ni en las capturas. La contraseña apareció en la salida de terminal compartida; debe cambiarse y evitarse volver a exponerla.
 ---
 
 ## 6. Evidencias de la configuración de VLAN y del router
@@ -362,7 +375,7 @@ show interfaces trunk
 - Se descarta el resto del tráfico de `vlan20` hacia `vlan10` y el tráfico de `vlan30` hacia `vlan10` y `vlan20`.
 - No aparece una regla de descarte general al final de la cadena `forward`; el tráfico que no coincide con estas reglas no queda bloqueado por ellas.
 
-**Conclusión:** Las redirecciones NAT y la aceptación del tráfico FTP están limitadas a la IP de la asesoría. La prueba de acceso autorizado al puerto 21 aparece en la sección 5.1; la prueba desde otra IP sigue pendiente.
+**Conclusión:** Las redirecciones NAT y la aceptación del tráfico FTP están limitadas a la IP de la asesoría. Las secciones 5.1 y 5.3 documentan la conexión autorizada, la autenticación y el listado pasivo; la sección 5.2 documenta el rechazo desde una IP distinta dentro de la WAN simulada.
 
 ### 6.3 Servicios de administración del router
 
