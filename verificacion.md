@@ -242,6 +242,8 @@ curl -v telnet://192.168.122.20:21
 
 * **Resultado:** Conexión establecida correctamente con respuesta del banner del servidor (`220 (vsFTPd 3.0.5)`), confirmando que la operativa diaria de intercambio de archivos no se ve interrumpida.
 
+![Prueba FTP autorizada desde la Asesoría Fiscal](Images/ftp-acceso-autorizado.png)
+
 ### 5.2 Prueba de Bloqueo a Terceros Externos No Autorizados
 
 Se asigna temporalmente una dirección IP secundaria (`192.168.122.99`) en la interfaz externa para simular un intento de intrusión desde cualquier otro origen de Internet distinto a la Asesoría Fiscal.
@@ -253,6 +255,8 @@ ip addr del 192.168.122.99/24 dev eth0
 ```
 
 * **Resultado:** Conexión rechazada (`Connection refused` / `Failed to connect to 192.168.122.20 port 21`), demostrando que el servicio FTP permanece cerrado e inaccesible para cualquier equipo externo cuya IP no coincida con la regla `src-address=192.168.122.50`.
+
+![Prueba FTP bloqueada desde una IP no autorizada](Images/ftp-acceso-bloqueado.png)
 ---
 
 ## 6. Evidencias de la configuración de VLAN y del router
@@ -301,6 +305,9 @@ show interfaces trunk
 
 **Observación:** La regla `connection-nat-state=dstnat` no especifica destino ni puerto. Actualmente depende de que las reglas Destination NAT estén restringidas correctamente; si se añaden nuevas redirecciones, hay que revisar que no se permita tráfico no previsto.
 
+![Reglas NAT del router](Images/ftp-nat-router.png)
+![Reglas de firewall del router](Images/ftp-firewall-router.png)
+
 ### 6.3 Servicios de administración del router
 
 **Comando ejecutado en `Router-operadora`:**
@@ -315,6 +322,8 @@ show interfaces trunk
 - Activos y limitados a `192.168.1.0/28` y `192.168.1.64/26`: WWW, SSH y Winbox.
 
 **Conclusión:** La salida confirma que los servicios de administración activos están limitados a las redes de servidores/gestión y plantilla. No muestra por sí sola el resultado de intentos de conexión desde VLAN 30 o desde la red externa.
+
+![Servicios del router y rangos de administración permitidos](Images/ftp-servicios-router.png)
 
 ### 6.4 Pruebas de conectividad inter-VLAN pendientes
 
