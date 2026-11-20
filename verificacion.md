@@ -310,3 +310,87 @@ En el portátil, el menú se mostró temporalmente para poder hacer la prueba (`
 - El servidor arranca sin intervención y Samba sigue sirviendo la carpeta de clientes.
 - Laura arranca su portátil igual que antes: solo la clave de LUKS, que es la medida de cifrado, y su login.
 - Ninguna de estas medidas cambia la forma de trabajar de la plantilla.
+
+---
+
+# Revisar el acceso desde Internet y acotar el servicio FTP del router
+
+## 7. Verificación del FTP limitado desde Internet
+
+**Equipo de origen:** `Asesoria-fiscal` (`192.168.122.50`).
+
+**Prueba 1: acceso desde la dirección autorizada.**
+
+Desde `Asesoria-fiscal` se comprobó el puerto FTP del router:
+
+```bash
+curl -v telnet://192.168.122.51:21
+```
+
+Resultado:
+
+```text
+* Connected to 192.168.122.51 (192.168.122.51) port 21
+220 (vsFTPd 3.0.5)
+```
+
+La dirección autorizada recibió el banner de `vsftpd`, por lo que el canal de control TCP/21 estaba accesible.
+
+![Acceso FTP autorizado](Images/ftp-acceso-autorizado.png)
+
+**Prueba 2: bloqueo desde una dirección no autorizada.**
+
+Se asignó temporalmente `192.168.122.99/24` a `Asesoria-fiscal`, se volvió a probar el puerto 21 y se retiró la dirección.
+
+```bash
+ip addr add 192.168.122.99/24 dev eth0
+curl --interface 192.168.122.99 -m 3 -v telnet://192.168.122.51:21
+ip addr del 192.168.122.99/24 dev eth0
+```
+
+Resultado: la conexión fue rechazada con `Connection refused`.
+
+![FTP bloqueado desde una dirección no autorizada](Images/hugo-ftp-bloqueado-final.png)
+
+**Prueba 3: transferencia en modo pasivo.**
+
+```bash
+curl -v --ftp-pasv --user asesoriafiscal ftp://192.168.122.51/
+```
+
+El servidor respondió `230 Login successful` y permitió listar archivos. Negoció el puerto pasivo `40036`, dentro del rango `40000-40050` configurado en el router.
+
+**Configuración verificada en el router:**
+
+- Las reglas Destination NAT permiten TCP/21 y TCP/40000-40050 solamente desde `192.168.122.50`.
+- Las reglas de forward permiten las sesiones establecidas y relacionadas.
+- Los servicios Telnet, FTP, API y API-SSL están deshabilitados.
+- WWW, SSH y Winbox están limitados a las redes de administración VLAN 10 y VLAN 20.
+
+![Redirecciones FTP](Images/ftp-nat-router.png)
+![Reglas de firewall](Images/ftp-firewall-router.png)
+![Servicios del router](Images/ftp-servicios-router.png)
+
+# Eliminar la cuenta del becario y limitar privilegios
+
+## 8. Verificación de la eliminación de la cuenta `becario`
+
+**Equipo comprobado:** `srv-mareas`.
+
+Se comprobó que la cuenta ya no existía y que no quedaba una entrada de sudoers específica para ella:
+
+```text
+id becario
+id: becario: no such user
+
+ls /etc/sudoers.d
+README
+```
+
+Resultado:
+
+- La cuenta `becario` no existe.
+- No aparece ningún archivo `becario` en `/etc/sudoers.d`.
+- El acceso administrativo asociado a esa cuenta quedó retirado.
+
+La comprobación completa de la sintaxis de sudoers queda pendiente de ejecutar `sudo visudo -c`, porque no se pudo realizar durante la implantación documentada.

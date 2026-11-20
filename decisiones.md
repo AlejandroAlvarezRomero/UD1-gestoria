@@ -648,3 +648,71 @@ Con acceso físico, toda protección del arranque se puede acabar saltando. Lo i
 
 **Decisión.**
 Ninguna capa basta por sí sola. BIOS, GRUB y LUKS se cubren entre sí. Los riesgos que quedan abiertos se recogen en `aprendizaje.md`.
+
+---
+
+# Revisar el acceso desde Internet y acotar el servicio FTP del router
+
+## D-H1 · Acotar el acceso externo por FTP
+
+**Medida:** Revisar el acceso desde Internet y acotar el servicio FTP del router · **Responsable:** Hugo Pérez Arévalo
+
+**Contexto.**
+La Asesoría Fiscal necesita acceder al servidor por FTP desde una red exterior. El puerto 21 y el rango pasivo `40000-40050` estaban abiertos sin limitar el origen de las conexiones.
+
+**Opciones valoradas.**
+
+1. Mantener las redirecciones FTP abiertas a cualquier dirección externa.
+2. Bloquear completamente el FTP externo.
+3. Mantener FTP, pero permitirlo únicamente desde la dirección conocida de la Asesoría Fiscal.
+4. Sustituir FTP por SFTP.
+
+Se descartó bloquear completamente el servicio porque impediría el trabajo habitual de la asesoría. SFTP se descartó porque exigiría cambiar los programas y los procedimientos de la asesoría.
+
+**Decisión.**
+Se mantienen FTP y el modo pasivo, pero las redirecciones Destination NAT del router se limitan al origen `192.168.122.50`. También se permite el tráfico de conexiones establecidas y relacionadas, así como el tráfico redirigido por NAT.
+
+```routeros
+/ip firewall nat
+add action=dst-nat chain=dstnat dst-port=21 in-interface=ether1 protocol=tcp src-address=192.168.122.50 to-addresses=192.168.1.10
+add action=dst-nat chain=dstnat dst-port=40000-40050 in-interface=ether1 protocol=tcp src-address=192.168.122.50 to-addresses=192.168.1.10
+```
+
+```routeros
+/ip firewall filter
+add action=accept chain=forward connection-state=established,related place-before=0
+add action=accept chain=forward connection-nat-state=dstnat place-before=1
+```
+
+**Consecuencias.**
+
+- La Asesoría Fiscal conserva el acceso necesario.
+- Las direcciones externas distintas de `192.168.122.50` no pueden usar las redirecciones FTP.
+- FTP sigue transmitiendo sin cifrado; el riesgo se reduce temporalmente limitando el origen.
+- La dirección de origen autorizada deberá actualizarse si cambia.
+
+---
+
+# Eliminar la cuenta del becario y limitar privilegios
+
+## D-H2 · Eliminar la cuenta del becario y retirar privilegios administrativos
+
+**Medida:** Eliminar la cuenta del becario y limitar privilegios · **Responsable:** Hugo Pérez Arévalo
+
+**Contexto.**
+La cuenta `becario` ya no debía tener acceso al servidor ni capacidad administrativa. El usuario y cualquier regla de privilegios podían seguir activos aunque el becario hubiese dejado de trabajar en la gestoría.
+
+**Opciones valoradas.**
+
+1. Mantener la cuenta y retirar únicamente el acceso remoto.
+2. Mantener la cuenta deshabilitada por si fuese necesaria en el futuro.
+3. Eliminar la cuenta y retirar cualquier configuración de privilegios asociada.
+
+**Decisión.**
+Se seleccionó la opción 3. Se eliminó la cuenta `becario` del servidor y se retiró su configuración administrativa de `/etc/sudoers.d`.
+
+**Consecuencias.**
+
+- El antiguo becario no puede iniciar sesión con esa cuenta.
+- No conserva privilegios de administración mediante una entrada específica en sudoers.
+- Cualquier nuevo usuario administrativo deberá crearse según una autorización actual y documentada.
