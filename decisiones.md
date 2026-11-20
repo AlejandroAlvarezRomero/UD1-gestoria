@@ -429,3 +429,222 @@ Permite iniciar sesión en el escritorio y utilizar el sistema operativo.
 Ambas contraseñas son independientes.
 
 ---
+
+# LUIS
+
+## D-L1 · Qué parámetros del núcleo cerrar
+
+**Medida:** Comprobar las protecciones del sistema y confinar un servicio · **Responsable:** Luis Baena
+
+**Contexto.**
+Ubuntu 24.04 trae ya muchas protecciones del núcleo activadas de serie. Aplicar una lista larga de parámetros sin comprobar el estado previo no añade seguridad: solo repite lo que ya venía y deja configuración que nadie sabe explicar.
+
+**Opciones valoradas.**
+
+1. Aplicar una lista genérica de hardening (CIS, o la que propone una IA), de unos 30 parámetros.
+2. Comprobar primero el valor de cada parámetro y cerrar solo los que venían abiertos y sabemos explicar.
+
+**Decisión.**
+Elegimos la opción 2. Revisamos 17 parámetros. Siete ya protegían de serie y no se tocan: ASLR, `dmesg_restrict`, `perf_event_paranoid`, BPF sin privilegios, `protected_symlinks/hardlinks/regular` y `tcp_syncookies`. Cerramos 8, todos en un fichero propio, `/etc/sysctl.d/99-mareas.conf`:
+
+| Parámetro                             | De serie | Aplicado | Qué protege                                                                            |
+| -------------------------------------- | -------- | -------- | --------------------------------------------------------------------------------------- |
+| `kernel.kptr_restrict`               | 1        | 2        | Oculta las direcciones del núcleo también a root, lo que dificulta los exploits       |
+| `kernel.yama.ptrace_scope`           | 1        | 2        | Solo root puede engancharse a otro proceso para leer su memoria o inyectarle código    |
+| `kernel.kexec_load_disabled`         | 0        | 1        | Impide cargar otro núcleo en caliente. No se puede deshacer sin reiniciar              |
+| `kernel.sysrq`                       | 176      | 0        | Desactiva las combinaciones de teclado de bajo nivel en la consola                      |
+| `fs.suid_dumpable`                   | 2        | 0        | Un programa con privilegios que falla no deja un volcado de memoria con datos sensibles |
+| `net.ipv4.conf.all.accept_redirects` | 1        | 0        | El servidor ignora redirecciones ICMP que podrían desviar su tráfico                  |
+| `net.ipv4.conf.all.send_redirects`   | 1        | 0        | El servidor no enruta, así que no tiene por qué enviarlas                             |
+| `net.ipv4.conf.all.log_martians`     | 0        | 1        | Registra paquetes con direcciones imposibles, señal de suplantación                   |
+
+**Descartados.**
+
+- `ip_forward` y `rp_filter`: no aportan nada en un servidor con una sola interfaz y podrían interferir con la red nueva.
+- `fs.protected_fifos=2`: la mejora es marginal en este servidor.
+
+**Consecuencias.**
+
+- Transparente para la plantilla.
+- `ptrace_scope=2` impide depurar procesos sin root. En un servidor de producción no hace falta.
+- El fichero propio permite ver de un vistazo qué hemos cambiado nosotros y deshacerlo borrando un solo fichero.
+
+---
+
+## D-L2 · Desactivar Apport
+
+**Contexto.**
+Tras el primer reinicio, `fs.suid_dumpable` volvió a valer 2. Apport, el sistema de informes de fallos de Ubuntu, fija ese valor cada vez que arranca y anulaba nuestra medida.
+
+**Opciones valoradas.**
+
+1. Quitar `fs.suid_dumpable` de la lista y aceptar el valor 2.
+2. Desactivar Apport.
+
+**Decisión.**
+Elegimos la opción 2: `systemctl disable --now apport` y `enabled=0` en `/etc/default/apport`. Apport solo sirve para enviar informes de fallos a Canonical. En un servidor sin escritorio no aporta nada a la gestoría, y además encaja con la reducción de servicios innecesarios (7a).
+
+**Consecuencias.**
+
+- Tras el siguiente reinicio, `fs.suid_dumpable` se mantiene a 0.
+- Si un programa falla, no se genera un informe automático. El administrador sigue teniendo los logs del sistema.
+
+---
+
+## D-L3 · Qué servicio confinar
+
+**Contexto.**
+La rúbrica pide confinar al menos un servicio expuesto. En el servidor hay tres candidatos: Samba (puertos 139 y 445), nginx (puerto 80) y vsftpd (puerto 21, abierto a la asesoría externa).
+
+**Opciones valoradas.**
+
+| Servicio         | A favor                                                                                      | En contra                                          |
+| ---------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Samba (`smbd`) | Es el servicio que guarda los documentos de clientes y el que usa toda la plantilla a diario | Si el confinamiento falla, nadie puede trabajar    |
+| nginx            | Fácil de confinar y con poco riesgo                                                         | Su uso en la gestoría es menor                    |
+| vsftpd           | Es el único accesible desde fuera de la oficina                                             | Su uso está limitado a una sola IP (la asesoría) |
+
+**Decisión.**
+Confinamos `smbd`, que es donde está el activo más valioso: los documentos de clientes. Usamos las opciones de aislamiento de systemd en un fichero drop-in (`/etc/systemd/system/smbd.service.d/confinamiento.conf`), que no modifica el unit original y se deshace borrando un fichero. Elegimos systemd en lugar de AppArmor porque `systemd-analyze security` permite medir el antes y el después.
+
+**Consecuencias.**
+
+- La nota de exposición baja de **9.6 UNSAFE a 6.0 MEDIUM**.
+- La plantilla sigue accediendo a la carpeta de clientes igual que antes.
+- vsftpd queda sin confinar. Lo dejamos como riesgo abierto y mejora futura en `aprendizaje.md`.
+
+---
+
+## D-L4 · Hasta dónde confinar Samba
+
+**Contexto.**
+`ProtectSystem=strict` deja todo el sistema en solo lectura. Samba necesita escribir en la carpeta de clientes y en sus propios directorios.
+
+**Opciones valoradas.**
+
+1. Solo `ProtectSystem=strict` y `ProtectHome`, como decía la propuesta.
+2. Confinamiento amplio con las rutas de escritura acotadas.
+3. Añadir además `CapabilityBoundingSet` y `SystemCallFilter` para bajar más la nota.
+
+**Decisión.**
+Elegimos la opción 2:
+
+- `ProtectSystem=strict` con `ReadWritePaths` limitado a `/srv/gestoria/clientes`, `/var/lib/samba`, `/var/log/samba`, `/var/cache/samba` y `/run/samba`.
+- `ProtectHome=yes`: no hay recurso `[homes]`, comprobado con `testparm`.
+- `PrivateTmp=yes`: cubre el `/var/tmp` que usa `[printers]`.
+- `PrivateDevices`, `ProtectKernel*`, `ProtectControlGroups`, `ProtectClock`, `ProtectHostname`, `RestrictRealtime`, `RestrictNamespaces`, `LockPersonality` y `SystemCallArchitectures=native`.
+
+Descartamos la opción 3. Samba necesita cambiar de usuario y de permisos para atender a cada asesor (`CAP_SETUID`, `CAP_SETGID`, `CAP_DAC_OVERRIDE`…). Recortarle capacidades o llamadas al sistema tiene mucho riesgo de romper el acceso, y la regla del cliente es no parar.
+
+**Consecuencias.**
+
+- La nota se queda en 6.0 y no baja más.
+- Si alguien explota un fallo de Samba, no puede modificar el sistema, ver las carpetas personales, cargar módulos del núcleo ni tocar el reloj. Solo puede escribir donde Samba ya escribía.
+- Si en el futuro se añade otra carpeta compartida, habrá que añadirla a `ReadWritePaths`.
+
+---
+
+## D-L5 · Contraseñas de BIOS/UEFI de cada equipo
+
+**Medida:** Proteger el acceso a BIOS/UEFI y el arranque · **Responsable:** Luis Baena
+
+**Contexto.**
+El portátil y el servidor tienen usos distintos. El portátil sale de la oficina y puede robarse, como ya pasó en septiembre. El servidor tiene que volver a arrancar solo después de un corte de luz. Además, la gestoría guardaba las contraseñas en un pósit junto al equipo de la jefa.
+
+**Opciones valoradas.**
+
+| Contraseña             | Portátil             | Servidor   |
+| ----------------------- | --------------------- | ---------- |
+| Administración (setup) | Sí                   | Sí        |
+| Arranque (power-on)     | Valorada y descartada | Descartada |
+
+**Decisión.**
+
+- **Contraseña de administración en los dos equipos.** Impide cambiar el orden de arranque, activar el arranque desde USB o desactivar protecciones.
+- **Sin contraseña de arranque en el portátil.** El disco ya está cifrado con LUKS y pide su clave al encender. Una segunda contraseña sería otra molestia para Laura y casi no añade protección.
+- **Sin contraseña de arranque en el servidor.** Tras un reinicio o un corte de luz, el servidor se quedaría parado hasta que alguien la escribiera, y la gestoría no podría trabajar.
+- **Custodia:** una contraseña distinta en cada equipo, conocida solo por la jefa y el informático y guardada en sobre cerrado o gestor de contraseñas. Nunca en un pósit ni en el repositorio.
+
+**Limitación del laboratorio.**
+Las dos máquinas virtuales arrancan con BIOS clásica (SeaBIOS de QEMU). Lo comprobamos porque no existe `/sys/firmware/efi` y porque *Enable UEFI boot mode* está desactivado en GNS3. SeaBIOS no permite contraseña de setup, así que en el laboratorio esta medida queda documentada para el equipo real. La protección equivalente se consigue con la configuración de la VM en GNS3 (D-L6) y con la contraseña de GRUB (D-L7).
+
+**Consecuencias.**
+
+- La plantilla no nota nada. Solo afecta al soporte técnico.
+- Si se olvida la contraseña de administración del equipo real, habrá que borrar la CMOS. Por eso se guarda en sobre cerrado.
+
+---
+
+## D-L6 · Arranque solo desde el disco interno
+
+**Contexto.**
+Si un equipo puede arrancar desde USB, CD o red, cualquiera con acceso físico puede iniciar otro sistema (por ejemplo Kali) y saltarse el sistema operativo instalado.
+
+**Opciones valoradas.**
+
+1. Equipo real: configurarlo en el setup de la BIOS/UEFI.
+2. Laboratorio: configurarlo en las opciones de la máquina virtual en GNS3.
+3. Laboratorio: además, cambiar las VM a UEFI y activar Secure Boot y TPM.
+
+**Decisión.**
+
+- **Equipo real (procedimiento documentado):** desactivar el arranque desde USB, CD y PXE, dejar el disco interno como única opción, activar Secure Boot y proteger el menú de arranque (F12) con la contraseña de administración.
+- **Laboratorio (implantado):**
+  - **Boot priority `HDD`:** ya venía así de serie y lo comprobamos.
+  - **Unidad de CD vacía.**
+  - **`-boot menu=off,strict=on`** en las opciones de QEMU. `menu=off` desactiva el menú de arranque de la BIOS y `strict=on` impide que, si el disco falla, intente arrancar desde otro dispositivo, como la red.
+- **Descartamos la opción 3.** Cambiar el firmware de una VM que ya está instalada puede dejarla sin arrancar, y la regla del cliente es no parar.
+
+**Consecuencias.**
+
+- Las VM solo pueden arrancar desde su disco.
+- Sin Secure Boot, en el laboratorio no se verifica la firma del gestor de arranque. Lo dejamos como límite y como mejora para el equipo real.
+
+---
+
+## D-L7 · Contraseña de GRUB
+
+**Contexto.**
+GRUB viene sin contraseña. Al arrancar, cualquiera puede pulsar `e`, editar la línea del núcleo y entrar como root sin contraseña, o abrir la consola de GRUB (`c`) y cargar un sistema desde un USB aunque la BIOS lo tenga bloqueado. Además, el menú de recuperación da una shell de root directamente. El menú venía oculto (`GRUB_TIMEOUT_STYLE=hidden`), pero eso no protege nada: pulsando una tecla aparece.
+
+**Opciones valoradas.**
+
+1. Contraseña de GRUB para todo, también para arrancar normalmente.
+2. Contraseña solo para editar, para la consola y para las entradas no habituales. El arranque normal queda libre.
+
+**Decisión.**
+Elegimos la opción 2, en el servidor y en el portátil:
+
+- **Superusuario `admingrub`** con contraseña cifrada (PBKDF2) en `/etc/grub.d/40_custom`. La contraseña es distinta en cada equipo y no está en el repositorio.
+- **`--unrestricted`** en las entradas normales de Ubuntu (`/etc/grub.d/10_linux`). El servidor arranca solo y el portátil no añade ninguna molestia a Laura.
+- **`GRUB_DISABLE_RECOVERY="true"`**: se elimina el modo recuperación.
+- **Portátil:** se retiran del menú las entradas de memtest86+ (`chmod -x /etc/grub.d/20_memtest86+`). Ya estaban protegidas por la contraseña, pero Laura no las necesita.
+
+Descartamos la opción 1 por los mismos motivos que la contraseña de arranque de la BIOS (D-L5).
+
+**Consecuencias.**
+
+- La plantilla no nota nada: el arranque es igual que antes.
+- Editar el arranque, usar la consola de GRUB o entrar en la configuración del firmware desde GRUB exige la contraseña.
+- Si se olvida, el sistema sigue arrancando. Se puede volver a generar desde Ubuntu con sudo.
+
+---
+
+## D-L8 · Límites de la protección del arranque y qué los cubre
+
+**Contexto.**
+Con acceso físico, toda protección del arranque se puede acabar saltando. Lo importante es saber qué otra capa cubre cada hueco.
+
+| Límite                                                                              | Qué lo cubre                                                                                             |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Quitar la pila de la placa (Clear CMOS) borra la contraseña de la BIOS              | **Cifrado LUKS:** aunque arranquen otro sistema, el disco no se puede leer                          |
+| Contraseñas maestras de algunos fabricantes                                         | **LUKS**                                                                                            |
+| Sacar el disco y conectarlo a otro equipo                                            | **LUKS**                                                                                            |
+| Saltarse GRUB arrancando desde un USB                                                | **Arranque solo desde disco + contraseña de BIOS** (y Secure Boot en el equipo real)               |
+| Usar la consola de GRUB para cargar un sistema externo                               | **Contraseña de GRUB**                                                                             |
+| Manipular `/boot`, que no va cifrado, para capturar la clave de LUKS ("evil maid") | **Contraseña de GRUB** y Secure Boot en el equipo real. **Riesgo abierto** en el laboratorio |
+| Robar el portátil encendido con la sesión abierta                                  | **Ninguna de estas capas.** Hace falta el bloqueo automático de pantalla. **Riesgo abierto** |
+| Acceso físico al servidor                                                           | Sala o armario cerrado con llave, con lo que ya hay. Lo decide el cliente                                 |
+
+**Decisión.**
+Ninguna capa basta por sí sola. BIOS, GRUB y LUKS se cubren entre sí. Los riesgos que quedan abiertos se recogen en `aprendizaje.md`.
