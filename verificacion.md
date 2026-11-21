@@ -343,3 +343,184 @@ Resultado:
 - El acceso administrativo asociado a esa cuenta quedó retirado.
 
 La comprobación completa de la sintaxis de sudoers queda pendiente de ejecutar `sudo visudo -c`, porque no se pudo realizar durante la implantación documentada.
+
+# Verificación de Medidas de Implantación: Segmentación y Seguridad de Red
+
+**Sesión de verificación:** Martes, 3 de noviembre de 2026  
+**Entorno:** Maqueta GNS3 — Infraestructura de red de **Mareas Asesores** (`Switch-oficina`, `Router-operadora`, `srv-mareas` y puestos cliente).
+
+---
+
+### Medida: Segmentación de red en Capa 2 mediante VLANs y enlace troncal 802.1Q
+- **Qué se comprueba:** Que los puertos físicos de `Switch-oficina` quedan separados en tres dominios de difusión independientes (`VLAN 10 SERVIDORES`, `VLAN 20 PLANTILLA` y `VLAN 30 CLIENTES`) y que el puerto `Gi0/0` opera en modo `trunk` 802.1Q hacia el router, impidiendo que un equipo conectado en la sala de espera (`VLAN 30`) intercepte tráfico de Capa 2 de los empleados (`VLAN 20`) o del servidor (`VLAN 10`).
+- **Cómo se ha comprobado (orden, desde qué equipo):** Ejecución de `show vlan brief` y `show interfaces trunk` en la consola de `Switch-oficina`, más prueba de conectividad directa en Capa 2 desde `Movil-cliente` (`192.168.1.130`, `VLAN 30`) hacia `Puesto-1` (`192.168.1.69`, `VLAN 20`).
+- **Antes:**
+  ```text
+  Switch-oficina# show vlan brief
+  VLAN Name                             Status    Ports
+  ---- -------------------------------- --------- -------------------------------
+  1    default                          active    Gi0/0, Gi0/1, Gi0/2, Gi0/3,
+                                                  Gi1/0, Gi1/1, Gi1/2, Gi1/3
+  ```
+  Todos los equipos de la oficina compartían la `VLAN 1` por defecto sin aislamiento ni etiquetado troncal.
+- **Después:**
+  ```text
+  Switch-oficina# show vlan brief
+  VLAN Name                             Status    Ports
+  ---- -------------------------------- --------- -------------------------------
+  1    default                          active    
+  10   SERVIDORES                       active    Gi0/1
+  20   PLANTILLA                        active    Gi0/2, Gi0/3, Gi1/0, Gi1/1, Gi1/2
+  30   CLIENTES                         active    Gi1/3
+
+  Switch-oficina# show interfaces trunk
+  Port        Mode             Encapsulation  Status        Native vlan
+  Gi0/0       on               802.1q         trunking      1
+  Port        Vlans allowed on trunk
+  Gi0/0       10,20,30
+  ```
+- **¿Sigue funcionando tras reiniciar?:** Sí. Se guardó la configuración en memoria NVRAM con `write memory` (`Building configuration... [OK]`) y tras reiniciar `Switch-oficina` en GNS3 se mantiene intacta la asignación de puertos y el enlace troncal.
+- **¿La gestoría sigue trabajando? Qué se ha probado:** Sí. Los puestos de empleados (`Gi0/2`, `Gi0/3`, `Gi1/0`) y las impresoras de red (`Gi1/1`, `Gi1/2`) mantienen conectividad interna dentro de la `VLAN 20` (`ping 192.168.1.65` desde `Portatil` con `0% packet loss`).
+- **Comprobado por:** Alejandro Álvarez Romero
+
+---
+
+### Medida: Direccionamiento IP mediante VLSM y Enrutamiento Inter-VLAN
+- **Qué se comprueba:** Que cada departamento utiliza una subred ajustada a sus necesidades reales (`/28` para servidores con 14 hosts útiles; `/26` para plantilla y clientes con 62 hosts útiles cada una), que las subinterfaces `vlan10`, `vlan20` y `vlan30` enrutadas en `ether7` de `Router-operadora` actúan como puertas de enlace y que todos los nodos finales tienen su IP estática y máscara configuradas sin solapamientos.
+- **Cómo se ha comprobado (orden, desde qué equipo):** Ejecución de `/ip address print` en `Router-operadora`, `ip a show ens3` y `ping 192.168.1.1` en `srv-mareas`, `ip a show ens3` y `ping 192.168.1.65` en `Portatil`, `ipconfig` en `Puesto-1` y `Puesto-2`, y `show ip` en `Impresora-1`, `Impresora-2` y `Movil-cliente`.
+- **Antes:**
+  ```text
+  administrador@srv-mareas:~$ ip a show ens3
+      inet 192.168.1.10/24 brd 192.168.1.255 scope global ens3
+  ```
+  Toda la red operaba bajo una única máscara `/24` sin subinterfaces VLAN en `Router-operadora`.
+- **Después:**
+  ```text
+  [admin@Router-operadora] > /ip address print
+  Flags: D - DYNAMIC
+  Columns: ADDRESS, NETWORK, INTERFACE
+  #   ADDRESS            NETWORK        INTERFACE
+  0   192.168.1.1/28     192.168.1.0    vlan10
+  1   192.168.1.65/26    192.168.1.64   vlan20
+  2   192.168.1.129/26   192.168.1.128  vlan30
+  3 D 192.168.122.51/24  192.168.122.0  ether6
+
+  administrador@srv-mareas:/etc/netplan$ ip a show ens3
+  2: ens3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+      inet 192.168.1.10/28 brd 192.168.1.15 scope global ens3
+
+  administrador@srv-mareas:/etc/netplan$ ping 192.168.1.1
+  PING 192.168.1.1 (192.168.1.1) 56(84) bytes of data.
+  64 bytes from 192.168.1.1: icmp_seq=1 ttl=64 time=12.5 ms
+  64 bytes from 192.168.1.1: icmp_seq=2 ttl=64 time=9.13 ms
+  ```
+  *(Evidencia adjunta en capturas de `Router-operadora`, `srv-mareas` y `Portatil` mostrando `inet 192.168.1.68/26 brd 192.168.1.127` y `ping 192.168.1.65` con `6 packets transmitted, 6 received, 0% packet loss`).*
+- **¿Sigue funcionando tras reiniciar?:** Sí. RouterOS guarda automáticamente; `srv-mareas` carga `/etc/netplan/01-gestoria.yaml` al arrancar; los VPCS (`Impresora-1`, `Impresora-2`, `Movil-cliente`) guardaron su estado con `save`; `Portatil` conserva su perfil `Manual` en NetworkManager; y `Puesto-1`/`Puesto-2` mantienen sus direcciones estáticas en Windows.
+- **¿La gestoría sigue trabajando? Qué se ha probado:** Sí. Cada equipo alcanza su puerta de enlace (`192.168.1.1`, `192.168.1.65` y `192.168.1.129`) y dispone de salida a Internet mediante NAT (`masquerade`) por `ether6`.
+- **Comprobado por:** Alejandro Álvarez Romero
+
+---
+
+### Medida: Aislamiento de la red WiFi de clientes/sala de espera (`VLAN 30`) mediante cortafuegos
+- **Qué se comprueba:** Que ningún dispositivo conectado en la red de clientes/invitados (`VLAN 30`, `192.168.1.128/26`) puede iniciar tráfico hacia la subred de servidores (`VLAN 10`, `192.168.1.0/28`) ni hacia los equipos e impresoras de la plantilla (`VLAN 20`, `192.168.1.64/26`).
+- **Cómo se ha comprobado (orden, desde qué equipo):** Desde `Movil-cliente` (`192.168.1.130`, situado en la red de riesgo `VLAN 30`), ejecución de `ping 192.168.1.129` (su puerta de enlace), `ping 192.168.1.10` (servidor) y `ping 192.168.1.69` (`Puesto-1`), junto con la revisión de `/ip firewall filter print` en `Router-operadora`.
+- **Antes:**
+  ```text
+  [admin@Router-operadora] > /ip firewall filter print
+  Flags: X - disabled, I - invalid; D - dynamic
+  (tabla vacía: el router enrutaba paquetes entre todas las VLANs sin restricciones)
+  ```
+- **Después:**
+  ```text
+  [admin@Router-operadora] > /ip firewall filter print
+   2   chain=forward action=drop in-interface=vlan30 out-interface=vlan10
+   3   chain=forward action=drop in-interface=vlan30 out-interface=vlan20
+
+  Movil-cliente> ping 192.168.1.129
+  84 bytes from 192.168.1.129 icmp_seq=1 ttl=64 time=1.421 ms
+
+  Movil-cliente> ping 192.168.1.10
+  192.168.1.10 icmp_seq=1 timeout
+  192.168.1.10 icmp_seq=2 timeout
+  192.168.1.10 icmp_seq=3 timeout
+
+  Movil-cliente> ping 192.168.1.69
+  192.168.1.69 icmp_seq=1 timeout
+  192.168.1.69 icmp_seq=2 timeout
+  ```
+- **¿Sigue funcionando tras reiniciar?:** Sí. Las reglas `2` y `3` en `/ip firewall filter` persisten tras reiniciar `Router-operadora` y los intentos de conexión desde `Movil-cliente` hacia `VLAN 10` y `VLAN 20` siguen devolviendo `timeout`.
+- **¿La gestoría sigue trabajando? Qué se ha probado:** Sí. Los clientes de la sala de espera conservan conectividad con su gateway (`192.168.1.129`) y salida a Internet por `ether6`, sin interferir en la operativa interna de `VLAN 20` ni `VLAN 10`.
+- **Comprobado por:** Alejandro Álvarez Romero
+
+---
+
+### Medida: Filtrado selectivo de servicios entre Plantilla y Servidores (`VLAN 20` -> `VLAN 10`)
+- **Qué se comprueba:** Que los puestos de empleados (`VLAN 20`) solo pueden comunicarse con el servidor `srv-mareas` (`192.168.1.10`, `VLAN 10`) mediante los puertos autorizados de trabajo (**TCP 80 HTTP** y **TCP 445 Samba**), descartándose cualquier otro protocolo o sondeo (como paquetes ICMP `ping` o puertos administrativos no permitidos).
+- **Cómo se ha comprobado (orden, desde qué equipo):** Desde `Portatil` (`192.168.1.68`, `VLAN 20`), ejecución de `ping 192.168.1.10` (intento de tráfico ICMP bloqueado) y acceso mediante navegador Firefox a `http://192.168.1.10` (tráfico permitido en puerto TCP `80`).
+- **Antes:**
+  ```text
+  laura@laura-Standard-PC-i440FX-PIIX-1996:~$ ping 192.168.1.10
+  64 bytes from 192.168.1.10: icmp_seq=1 ttl=63 time=4.12 ms
+  ```
+  Antes de aplicar las reglas en la cadena `forward`, cualquier equipo de `VLAN 20` podía realizar sondeos ICMP y alcanzar todos los puertos del servidor.
+- **Después:**
+  ```text
+  [admin@Router-operadora] > /ip firewall filter print
+   0   chain=forward action=accept protocol=tcp in-interface=vlan20
+       out-interface=vlan10 dst-port=80,445
+   1   chain=forward action=drop in-interface=vlan20 out-interface=vlan10
+
+  laura@laura-Standard-PC-i440FX-PIIX-1996:~$ ping 192.168.1.10
+  PING 192.168.1.10 (192.168.1.10) 56(84) bytes of data.
+  ^C
+  --- 192.168.1.10 ping statistics ---
+  58 packets transmitted, 0 received, 100% packet loss, time 58362ms
+  ```
+  *(Evidencia visual en captura de Firefox desde `Portatil` en `http://192.168.1.10`: carga correcta de la página **«Welcome to nginx!»**).*
+- **¿Sigue funcionando tras reiniciar?:** Sí. El orden de evaluación (`0` `accept` antes de `1` `drop`) permanece guardado en MikroTik tras reiniciar; el `ping` sigue dando `100% packet loss` y la web interna sigue accesible.
+- **¿La gestoría sigue trabajando? Qué se ha probado:** Sí. Desde `Portatil` (`192.168.1.68`) carga correctamente el servicio web interno en `http://192.168.1.10` (puerto `80`) y permanece habilitado el puerto `445` para las carpetas compartidas Samba.
+- **Comprobado por:** Alejandro Álvarez Romero
+
+---
+
+### Medida: Acceso externo acotado por IP origen para la Asesoría Fiscal (`NAT / FTP`)
+- **Qué se comprueba:** Que la redirección de puertos FTP (`dst-nat` en TCP `21` y rango pasivo `40000-40050`) hacia `srv-mareas` (`192.168.1.10`) en la interfaz exterior `ether6` (`192.168.122.51`) acepta exclusivamente conexiones procedentes de la IP autorizada de la Asesoría Fiscal (`192.168.122.50`), descartando peticiones de cualquier otra dirección externa.
+- **Cómo se ha comprobado (orden, desde qué equipo):** Revisión de `/ip firewall nat print` en `Router-operadora` y prueba de conexión `ftp 192.168.122.51` desde `Asesoria-fiscal` (`192.168.122.50`) frente a un intento desde otra IP externa no autorizada.
+- **Antes:**
+  ```text
+  [admin@Router-operadora] > /ip firewall nat print
+   0   chain=srcnat action=masquerade out-interface=ether1
+  ```
+  No existía redirección de entrada operativa en `ether6`, impidiendo el intercambio de ficheros con la asesoría.
+- **Después:**
+  ```text
+  [admin@Router-operadora] > /ip firewall nat print
+  Flags: X - disabled, I - invalid; D - dynamic
+   0   chain=srcnat action=masquerade out-interface=ether6
+
+   1   ;;; FTP-asesoria
+       chain=dstnat action=dst-nat to-addresses=192.168.1.10 protocol=tcp
+       src-address=192.168.122.50 in-interface=ether6 dst-port=21
+
+   2   ;;; FTP-pasivo-asesoria
+       chain=dstnat action=dst-nat to-addresses=192.168.1.10 protocol=tcp
+       src-address=192.168.122.50 in-interface=ether6 dst-port=40000-40050
+  ```
+  Desde `Asesoria-fiscal` (`192.168.122.50`), la conexión `ftp 192.168.122.51` alcanza el servicio FTP de `srv-mareas`, mientras que desde cualquier otra dirección IP externa la petición no obtiene respuesta.
+- **¿Sigue funcionando tras reiniciar?:** Sí. Las reglas `0`, `1` y `2` de `/ip firewall nat` sobre `ether6` permanecen guardadas en `Router-operadora` tras reiniciar el entorno.
+- **¿La gestoría sigue trabajando? Qué se ha probado:** Sí. La Asesoría Fiscal mantiene el intercambio de documentación mediante FTP activo y pasivo (`40000-40050`) contra `192.168.122.51` sin exponer el puerto `21` a todo Internet.
+- **Comprobado por:** Alejandro Álvarez Romero
+
+---
+
+## Criterios de Aceptación del Cliente
+
+| Criterio de aceptación | Dónde se comprueba |
+| :--- | :--- |
+| **1. Si nos roban otro portátil…** *(que la sustracción o conexión de un equipo no comprometa el servidor ni el resto de la red)* | Ficha **«Segmentación de red en Capa 2 mediante VLANs y enlace troncal 802.1Q»** y Ficha **«Filtrado selectivo de servicios entre Plantilla y Servidores (`VLAN 20` -> `VLAN 10`)»** (aislamiento entre departamentos y acceso limitado solo a puertos TCP `80,445`). |
+| **2. Que los clientes de la sala de espera (WiFi) no puedan ver ni atacar los equipos de la oficina ni el servidor** | Ficha **«Segmentación de red en Capa 2 mediante VLANs y enlace troncal 802.1Q»** (`Gi1/3` en `VLAN 30`) y Ficha **«Aislamiento de la red WiFi de clientes/sala de espera (`VLAN 30`) mediante cortafuegos»** (`ping` desde `Movil-cliente` hacia `192.168.1.10` y `192.168.1.69` con `timeout`). |
+| **3. Que los clientes de la sala de espera sigan teniendo salida a Internet** | Ficha **«Aislamiento de la red WiFi de clientes/sala de espera (`VLAN 30`) mediante cortafuegos»** (`Movil-cliente` alcanza `192.168.1.129` y navega mediante `masquerade` en `ether6`). |
+| **4. Que la Asesoría Fiscal externa pueda enviar y recibir ficheros por FTP sin abrir el servidor a todo Internet** | Ficha **«Acceso externo acotado por IP origen para la Asesoría Fiscal (`NAT / FTP`)»** (`dst-nat` en `ether6` puertos `21` y `40000-40050` acotado a `src-address=192.168.122.50`). |
+| **5. Que la plantilla pueda seguir trabajando con normalidad (web interna, carpetas compartidas e impresoras)** | Ficha **«Filtrado selectivo de servicios entre Plantilla y Servidores (`VLAN 20` -> `VLAN 10`)»** (acceso web a `http://192.168.1.10` en Firefox y apertura de TCP `445`) y Ficha **«Direccionamiento IP mediante VLSM y Enrutamiento Inter-VLAN»** (comunicación con `Impresora-1` e `Impresora-2` en `VLAN 20`). |
+| **6. Que la red esté ordenada por departamentos y sin desperdicio de direcciones IP** | Ficha **«Direccionamiento IP mediante VLSM y Enrutamiento Inter-VLAN»** (subredes `/28` en `VLAN 10` y `/26` en `VLAN 20` y `VLAN 30`). |
+| **7. Que las configuraciones sean persistentes tras reiniciar y no interrumpan el servicio** | Campo **«¿Sigue funcionando tras reiniciar?»** de las 5 fichas (`write memory` en Cisco, persistencia nativa en MikroTik, Netplan en Ubuntu Server, `save` en VPCS y NetworkManager Manual en `Portatil`). |

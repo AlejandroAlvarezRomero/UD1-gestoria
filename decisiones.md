@@ -716,3 +716,63 @@ Se seleccionó la opción 3. Se eliminó la cuenta `becario` del servidor y se r
 - El antiguo becario no puede iniciar sesión con esa cuenta.
 - No conserva privilegios de administración mediante una entrada específica en sudoers.
 - Cualquier nuevo usuario administrativo deberá crearse según una autorización actual y documentada.
+
+# Registro de Decisiones Técnicas: Segmentación y Seguridad de Red
+
+Este documento recoge las decisiones técnicas tomadas durante la implantación en GNS3 que modifican la propuesta inicial, eligen entre varias alternativas de diseño o asumen un riesgo residual controlado.
+
+---
+
+### Decisión: Reasignar la configuración del router MikroTik a las interfaces `ether6` (WAN) y `ether7` (Trunk)
+- **Fecha:** 3 de noviembre de 2026
+- **Contexto:** En `propuesta.md` estaban previstas las interfaces `ether1` para la salida exterior (WAN) y `ether2` para el enlace troncal hacia `Switch-oficina`. Al reiniciar el nodo `Router-operadora` en GNS3, el hipervisor reenumeró las tarjetas de red activas desplazándolas a `ether6` (conectada a la nube NAT exterior) y `ether7` (conectada al puerto `Gi0/0` del switch), dejando `ether1` y `ether2` sin enlace físico y asignando por DHCP la IP externa `192.168.122.51/24` sobre `ether6`.
+- **Opciones que valoramos:**
+  1. Eliminar el nodo MikroTik, crear uno nuevo desde cero y recablear toda la topología para forzar los nombres `ether1` y `ether2`.
+  2. Mantener el cableado físico operativo sobre `ether6` y `ether7`, limpiar la dirección IP huérfana y adaptar las subinterfaces VLAN (`vlan10`, `vlan20`, `vlan30`), el cliente DHCP y las reglas NAT a `ether6` y `ether7`.
+- **Qué decidimos y por qué:** Elegimos la opción 2 porque evita riesgos de desconfiguración en los enlaces ya validados con el switch, garantiza la estabilidad del proyecto en GNS3 y vincula todo el enrutamiento y el NAT a las interfaces físicas reales del router.
+- **Consecuencias:** Cambia respecto a `propuesta.md` (debe anotarse en `propuesta.md` que la implantación final usa `ether6` y `ether7` y que la IP exterior para las pruebas FTP de la Asesoría Fiscal es `192.168.122.51/24`). No introduce ningún riesgo de seguridad adicional.
+
+---
+
+### Decisión: Aplicar direccionamiento VLSM (`/28` para servidores y `/26` para plantilla y clientes) en lugar de subredes de tamaño fijo
+- **Fecha:** 3 de noviembre de 2026
+- **Contexto:** La gestoría partía de una única red plana `192.168.1.0/24` sin aislamiento entre departamentos. Al dividir la red en tres VLANs (`SERVIDORES`, `PLANTILLA` y `CLIENTES`), era necesario repartir el direccionamiento interno ajustándolo al volumen real de equipos de cada zona.
+- **Opciones que valoramos:**
+  1. Dividir el bloque `192.168.1.0/24` en tres subredes iguales `/26` (62 direcciones útiles cada una), dejando sin uso cerca de 50 direcciones en la red de servidores.
+  2. Aplicar VLSM asignando una máscara `/28` a `VLAN 10` (`192.168.1.0/28`, 14 hosts útiles para servidores), `/26` a `VLAN 20` (`192.168.1.64/26`, 62 hosts útiles para puestos e impresoras) y `/26` a `VLAN 30` (`192.168.1.128/26`, 62 hosts útiles para dispositivos móviles de clientes).
+- **Qué decidimos y por qué:** Elegimos la opción 2 (VLSM) porque reduce la superficie de escaneo en la subred crítica de servidores (solo 14 direcciones posibles), ofrece margen suficiente para los dispositivos de los clientes en sala de espera y conserva libre el último bloque `192.168.1.192/26` para futuras ampliaciones de la oficina.
+- **Consecuencias:** Obliga a configurar máscaras heterogéneas (`255.255.255.240` en `srv-mareas` y `255.255.255.192` en el resto de equipos). Cualquier error al introducir la máscara en un puesto impide alcanzar su puerta de enlace (`192.168.1.1`, `.65` o `.129`).
+
+---
+
+### Decisión: Bloquear el tráfico ICMP (`ping`) desde `VLAN 20` hacia `VLAN 10` permitiendo únicamente los puertos TCP `80` y `445`
+- **Fecha:** 3 de noviembre de 2026
+- **Contexto:** Los empleados de la plantilla (`VLAN 20`) necesitan acceder a la aplicación web interna (`HTTP`, puerto `80`) y a las carpetas compartidas (`Samba`, puerto `445`) alojadas en `srv-mareas` (`192.168.1.10`, `VLAN 10`). Sin embargo, dejar abierto todo el tráfico entre `VLAN 20` y `VLAN 10` permitiría que un puesto de empleado comprometido realizara reconocimientos de red (`ping sweeps`) o atacara otros servicios del servidor.
+- **Opciones que valoramos:**
+  1. Permitir todo el tráfico desde `VLAN 20` hacia `VLAN 10` y bloquear únicamente el acceso procedente de `VLAN 30` (clientes).
+  2. Establecer una regla de bloqueo por defecto (`action=drop`) entre `vlan20` y `vlan10` en la cadena `forward` del MikroTik, anteponiendo una única regla de aceptación (`action=accept`) restringida estrictamente a `protocol=tcp dst-port=80,445`.
+- **Qué decidimos y por qué:** Elegimos la opción 2 (principio de mínimo privilegio) porque asegura el trabajo diario de los empleados (web y carpetas compartidas) al tiempo que impide sondeos ICMP y conexiones a cualquier otro puerto del servidor.
+- **Consecuencias:** Las pruebas diagnósticas con `ping` desde los equipos de plantilla hacia `192.168.1.10` fallan intencionadamente (`100% packet loss`), por lo que la disponibilidad del servidor desde `VLAN 20` debe comprobarse directamente contra los servicios (`http://192.168.1.10` o `smb://192.168.1.10`).
+
+---
+
+### Decisión: Acotar por IP origen (`192.168.122.50`) el reenvío NAT del servicio FTP aceptando temporalmente el intercambio sin cifrar
+- **Fecha:** 3 de noviembre de 2026
+- **Contexto:** La gestoría colabora con una Asesoría Fiscal externa (`192.168.122.50`) que envía y descarga documentación mediante FTP clásico (puerto de control `21` y rango de datos pasivos `40000-40050`), un protocolo que transmite usuario, contraseña y ficheros en texto claro.
+- **Opciones que valoramos:**
+  1. Configurar reglas `dst-nat` estándar en los puertos `21` y `40000-40050` abiertas a cualquier IP origen (`0.0.0.0/0`).
+  2. Restringir las reglas `dst-nat` en `ether6` añadiendo el filtro `src-address=192.168.122.50` para descartar en el perímetro cualquier conexión FTP que no provenga de la IP fija de la asesoría.
+  3. Desactivar el FTP de inmediato y migrar a SFTP, obligando a la asesoría externa a reconfigurar su software cliente antes de poder trabajar.
+- **Qué decidimos y por qué:** Elegimos la opción 2 porque garantiza que la gestoría y la asesoría sigan operando sin interrupciones ni cambios en el cliente externo, mientras se oculta el puerto `21` frente a ataques automatizados desde Internet.
+- **Consecuencias:** Se acepta a sabiendas el riesgo residual de que las credenciales y ficheros FTP entre `192.168.122.50` y `192.168.1.10` viajen sin cifrar hasta coordinar una migración futura a SFTP/FTPS, y obliga a actualizar la regla NAT si la asesoría cambia de dirección IP pública.
+
+---
+
+### Decisión: Configurar la IP estática de `Portatil` (Ubuntu Desktop) desde NetworkManager gráfico en lugar de comandos `ip addr` / `ip route`
+- **Fecha:** 3 de noviembre de 2026
+- **Contexto:** En `propuesta.md` se planteaba asignar la dirección `192.168.1.68/26` en `Portatil` mediante comandos `sudo ip addr add` e `ip route add`. Al ejecutarlos en el entorno de escritorio Ubuntu, el demonio `NetworkManager` sobrescribió la interfaz `ens3` a los pocos segundos provocando el error `Error: Nexthop has invalid gateway` y perdiendo la configuración tras reiniciar.
+- **Opciones que valoramos:**
+  1. Detener o desinstalar `NetworkManager` en el portátil y aplicar la configuración de red por comandos manuales en cada inicio de sesión.
+  2. Configurar el perfil de red cableada en modo `Manual` directamente en `NetworkManager` (`192.168.1.68`, máscara `255.255.255.192`, puerta de enlace `192.168.1.65`) y reiniciar el adaptador.
+- **Qué decidimos y por qué:** Elegimos la opción 2 porque evita conflictos entre servicios de red, mantiene el funcionamiento estándar de un portátil de usuario en Ubuntu Desktop y asegura que la configuración de `VLAN 20` persista tras apagar o reiniciar el equipo.
+- **Consecuencias:** Modifica el procedimiento de implantación documentado en `propuesta.md` para los puestos cliente con escritorio Linux y garantiza la persistencia sin intervención manual.
