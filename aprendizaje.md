@@ -68,7 +68,11 @@ Durante el desarrollo hemos tenido que comprobar que las reglas no impiden el ac
 
 - FTP sigue utilizando texto claro.
 - Un USB con malware puede seguir usándose en los puestos de trabajo.
-- La protección de BIOS/UEFI puede dejarse sin validar hasta tener las evidencias reales.
+- La contraseña de BIOS/UEFI no se ha podido aplicar en el laboratorio: las máquinas virtuales usan SeaBIOS, que no la permite. Queda documentada para el equipo real.
+- Sin Secure Boot, la partición `/boot` del portátil (sin cifrar) podría manipularse con acceso físico para capturar la clave de LUKS. La contraseña de GRUB lo dificulta, pero no lo elimina.
+- Si roban el portátil encendido y con la sesión abierta, ni la BIOS, ni GRUB, ni LUKS protegen los datos. Haría falta el bloqueo automático de pantalla.
+- `vsftpd`, el servicio que usa la asesoría externa, sigue sin confinar. Sería el siguiente servicio que confinar.
+- El servidor tiene actualizaciones de seguridad pendientes.
 - LUKS no protege los datos mientras el sistema está desbloqueado y el usuario ha iniciado sesión.
 - La contraseña de cifrado puede perderse si no existe una gestión segura de claves o de recuperación.
 - La configuración de VLAN no sustituye las actualizaciones del sistema ni el mantenimiento de antivirus y parches.
@@ -93,7 +97,6 @@ El equipo debe confirmar por escrito con el cliente qué riesgos acepta definiti
 - Comprobar el acceso FTP desde `192.168.122.50`.
 - Comprobar el bloqueo FTP desde una dirección externa distinta.
 - Verificar que las reglas siguen funcionando después de reiniciar el router y el servidor.
-- Verificar la contraseña de BIOS/UEFI y el orden seguro de arranque.
 - Verificar el cifrado LUKS desde un sistema externo.
 - Comprobar que la eliminación del usuario `becario` es permanente y no quedan privilegios residuales.
 - Comprobar la seguridad del núcleo y el aislamiento de un servicio.
