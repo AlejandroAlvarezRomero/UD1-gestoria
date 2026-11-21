@@ -109,7 +109,7 @@ El resultado es una instalación de Ubuntu con almacenamiento cifrado, preparada
 
 Antes de cambiar nada, revisamos 17 parámetros de protección del núcleo:
 
-![sysctl antes](Images/7b-01-sysctl-antes.png)
+![sysctl antes](Images/sysctl-antes.png)
 
 | Parámetro | De serie | Estado |
 |---|---|---|

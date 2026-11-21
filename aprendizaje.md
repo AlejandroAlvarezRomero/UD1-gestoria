@@ -39,6 +39,24 @@ Hemos aprendido que los servicios del propio router forman parte de la superfici
 
 La desactivación de servicios y la limitación de SSH, WWW y Winbox a las VLAN internas reducen los equipos desde los que se puede administrar el MikroTik. Esta protección debe comprobarse desde cada segmento y desde Internet.
 
+### Endurecimiento del núcleo
+
+Hemos aprendido que antes de aplicar parámetros de seguridad hay que comprobar cómo viene el sistema. Ubuntu 24.04 ya trae activadas muchas protecciones (ASLR, `dmesg_restrict`, protección de enlaces…), y volver a ponerlas no añade nada. De los 17 parámetros que revisamos, solo cerramos los 8 que venían abiertos y que sabemos explicar.
+
+También hemos visto que no basta con aplicar un cambio: hay que comprobarlo después de reiniciar. Así descubrimos que Apport devolvía `fs.suid_dumpable` a su valor de serie en cada arranque y anulaba la medida.
+
+### Confinamiento de servicios
+
+Hemos aprendido a confinar un servicio con las opciones de aislamiento de systemd y a medir el resultado con `systemd-analyze security`. Con `ProtectSystem=strict` y una lista acotada de rutas de escritura, Samba sigue funcionando, pero si alguien explota un fallo no puede modificar el resto del sistema.
+
+Confinar tiene un límite: cuanto más se restringe un servicio, más fácil es romperlo. No recortamos las capacidades de Samba porque las necesita para atender a cada usuario, y preferimos una exposición media que funciona a una baja que impide trabajar a la gestoría.
+
+### Protección del arranque
+
+Hemos aprendido que GRUB viene abierto por defecto: cualquiera con acceso físico puede editar el arranque y entrar como root, o usar su consola para arrancar desde un USB aunque la BIOS lo tenga bloqueado. Con la opción `--unrestricted` se puede proteger la edición sin que el equipo deje de arrancar solo.
+
+También hemos visto que cada capa cubre los huecos de otra: la BIOS se borra quitando la pila, GRUB se salta arrancando otro sistema y el cifrado no protege un equipo con la sesión abierta. Ninguna basta por sí sola.
+
 ### Límites de las medidas
 
 Una VLAN no sustituye por sí sola al cifrado, al control de cuentas ni al control físico. El router puede bloquear tráfico entre redes, pero no protege automáticamente los datos almacenados en un equipo robado.
@@ -55,6 +73,9 @@ Del mismo modo, una contraseña de BIOS o UEFI puede impedir cambios habituales 
 - Mantendríamos actualizada una copia de seguridad de las configuraciones del router y el switch.
 - Sustituiríamos FTP por SFTP si el cliente pudiera cambiar el flujo de trabajo sin interrupciones.
 - Implementaríamos cuentas individuales en Samba antes de retirar el acceso compartido.
+- Haríamos un snapshot de las máquinas antes de cada cambio que afecte al arranque o a un servicio crítico.
+- Comprobaríamos el tipo de firmware (BIOS o UEFI) de cada equipo durante el diagnóstico, antes de proponer medidas que dependen de él.
+- Tendríamos preparada una imagen ISO de prueba para comprobar que los equipos no arrancan desde medios externos.
 
 ## Problemas encontrados
 
@@ -63,6 +84,8 @@ Al principio, el diagnóstico mostraba una red plana y equipos que podían comun
 También hemos identificado que el servidor tiene una configuración demasiado amplia de servicios y que Samba permitía acceso de invitado. El servidor necesitaba reducir su superficie de red y limitar los privilegios de las cuentas locales.
 
 Durante el desarrollo hemos tenido que comprobar que las reglas no impiden el acceso legítimo de la asesoría fiscal ni el trabajo de la plantilla.
+
+En el bastionado del servidor y del portátil encontramos varios problemas: una errata en un parámetro del núcleo que solo se detectó al comprobar su valor, Apport anulando una de las medidas al reiniciar, y que las máquinas virtuales arrancan con BIOS clásica en lugar de UEFI, lo que impide poner contraseña de BIOS y activar Secure Boot en el laboratorio. Además, el menú de GRUB está oculto y con tiempo cero, y para probar la contraseña en el portátil tuvimos que mostrarlo temporalmente y volver a ocultarlo después.
 
 ## Riesgos que quedan abiertos
 
