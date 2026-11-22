@@ -1,6 +1,6 @@
 # 1. Cifrado del portatil y de la partición del servidor
 
-## Configuración de un disco cifrado con LUKS en Ubuntu Server
+## 1.1 Configuración de un disco cifrado con LUKS en Ubuntu Server
 
 ### Objetivo de la decisión tomada
 
@@ -261,7 +261,7 @@ sudo cryptsetup status clientes_cifrado
 
 ---
 
-## Instalación de Ubuntu Desktop con cifrado LUKS en QEMU (GNS3)
+## 1.2 Instalación de Ubuntu Desktop con cifrado LUKS en QEMU (GNS3)
 
 ### Objetivo del ejercicio
 
@@ -430,9 +430,9 @@ Ambas contraseñas son independientes.
 
 ---
 
-# LUIS
+# 2. Protección del sistema y confinamiento de servicios
 
-## D-L1 · Qué parámetros del núcleo cerrar
+## 2.1 D-L1 · Qué parámetros del núcleo cerrar
 
 **Medida:** Comprobar las protecciones del sistema y confinar un servicio · **Responsable:** Luis Baena
 
@@ -471,7 +471,7 @@ Elegimos la opción 2. Revisamos 17 parámetros. Siete ya protegían de serie y 
 
 ---
 
-## D-L2 · Desactivar Apport
+## 2.2 D-L2 · Desactivar Apport
 
 **Contexto.**
 Tras el primer reinicio, `fs.suid_dumpable` volvió a valer 2. Apport, el sistema de informes de fallos de Ubuntu, fija ese valor cada vez que arranca y anulaba nuestra medida.
@@ -491,7 +491,7 @@ Elegimos la opción 2: `systemctl disable --now apport` y `enabled=0` en `/etc/d
 
 ---
 
-## D-L3 · Qué servicio confinar
+## 2.3 D-L3 · Qué servicio confinar
 
 **Contexto.**
 La rúbrica pide confinar al menos un servicio expuesto. En el servidor hay tres candidatos: Samba (puertos 139 y 445), nginx (puerto 80) y vsftpd (puerto 21, abierto a la asesoría externa).
@@ -515,7 +515,7 @@ Confinamos `smbd`, que es donde está el activo más valioso: los documentos de 
 
 ---
 
-## D-L4 · Hasta dónde confinar Samba
+## 2.4 D-L4 · Hasta dónde confinar Samba
 
 **Contexto.**
 `ProtectSystem=strict` deja todo el sistema en solo lectura. Samba necesita escribir en la carpeta de clientes y en sus propios directorios.
@@ -544,7 +544,9 @@ Descartamos la opción 3. Samba necesita cambiar de usuario y de permisos para a
 
 ---
 
-## D-L5 · Contraseñas de BIOS/UEFI de cada equipo
+# 3. Protección del acceso a BIOS/UEFI y del arranque
+
+## 3.1 D-L5 · Contraseñas de BIOS/UEFI de cada equipo
 
 **Medida:** Proteger el acceso a BIOS/UEFI y el arranque · **Responsable:** Luis Baena
 
@@ -575,7 +577,7 @@ Las dos máquinas virtuales arrancan con BIOS clásica (SeaBIOS de QEMU). Lo com
 
 ---
 
-## D-L6 · Arranque solo desde el disco interno
+## 3.2 D-L6 · Arranque solo desde el disco interno
 
 **Contexto.**
 Si un equipo puede arrancar desde USB, CD o red, cualquiera con acceso físico puede iniciar otro sistema (por ejemplo Kali) y saltarse el sistema operativo instalado.
@@ -602,7 +604,7 @@ Si un equipo puede arrancar desde USB, CD o red, cualquiera con acceso físico p
 
 ---
 
-## D-L7 · Contraseña de GRUB
+## 3.3 D-L7 · Contraseña de GRUB
 
 **Contexto.**
 GRUB viene sin contraseña. Al arrancar, cualquiera puede pulsar `e`, editar la línea del núcleo y entrar como root sin contraseña, o abrir la consola de GRUB (`c`) y cargar un sistema desde un USB aunque la BIOS lo tenga bloqueado. Además, el menú de recuperación da una shell de root directamente. El menú venía oculto (`GRUB_TIMEOUT_STYLE=hidden`), pero eso no protege nada: pulsando una tecla aparece.
@@ -630,7 +632,7 @@ Descartamos la opción 1 por los mismos motivos que la contraseña de arranque d
 
 ---
 
-## D-L8 · Límites de la protección del arranque y qué los cubre
+## 3.4 D-L8 · Límites de la protección del arranque y qué los cubre
 
 **Contexto.**
 Con acceso físico, toda protección del arranque se puede acabar saltando. Lo importante es saber qué otra capa cubre cada hueco.
@@ -651,9 +653,9 @@ Ninguna capa basta por sí sola. BIOS, GRUB y LUKS se cubren entre sí. Los ries
 
 ---
 
-# Revisar el acceso desde Internet y acotar el servicio FTP del router
+# 4. Revisar el acceso desde Internet y acotar el servicio FTP del router
 
-## D-H1 · Acotar el acceso externo por FTP
+## 4.1 D-H1 · Acotar el acceso externo por FTP
 
 **Medida:** Revisar el acceso desde Internet y acotar el servicio FTP del router · **Responsable:** Hugo Pérez Arévalo
 
@@ -693,9 +695,9 @@ add action=accept chain=forward connection-nat-state=dstnat place-before=1
 
 ---
 
-# Eliminar la cuenta del becario y limitar privilegios
+# 5. Eliminar la cuenta del becario y limitar privilegios
 
-## D-H2 · Eliminar la cuenta del becario y retirar privilegios administrativos
+## 5.1 D-H2 · Eliminar la cuenta del becario y retirar privilegios administrativos
 
 **Medida:** Eliminar la cuenta del becario y limitar privilegios · **Responsable:** Hugo Pérez Arévalo
 
@@ -717,13 +719,13 @@ Se seleccionó la opción 3. Se eliminó la cuenta `becario` del servidor y se r
 - No conserva privilegios de administración mediante una entrada específica en sudoers.
 - Cualquier nuevo usuario administrativo deberá crearse según una autorización actual y documentada.
 
-# Registro de Decisiones Técnicas: Segmentación y Seguridad de Red
+# 6. Segmentación y seguridad de red
 
 Este documento recoge las decisiones técnicas tomadas durante la implantación en GNS3 que modifican la propuesta inicial, eligen entre varias alternativas de diseño o asumen un riesgo residual controlado.
 
 ---
 
-### Decisión: Reasignar la configuración del router MikroTik a las interfaces `ether6` (WAN) y `ether7` (Trunk)
+### 6.1 Decisión: Reasignar la configuración del router MikroTik a las interfaces `ether6` (WAN) y `ether7` (Trunk)
 - **Fecha:** 3 de noviembre de 2026
 - **Contexto:** En `propuesta.md` estaban previstas las interfaces `ether1` para la salida exterior (WAN) y `ether2` para el enlace troncal hacia `Switch-oficina`. Al reiniciar el nodo `Router-operadora` en GNS3, el hipervisor reenumeró las tarjetas de red activas desplazándolas a `ether6` (conectada a la nube NAT exterior) y `ether7` (conectada al puerto `Gi0/0` del switch), dejando `ether1` y `ether2` sin enlace físico y asignando por DHCP la IP externa `192.168.122.51/24` sobre `ether6`.
 - **Opciones que valoramos:**
@@ -734,7 +736,7 @@ Este documento recoge las decisiones técnicas tomadas durante la implantación 
 
 ---
 
-### Decisión: Aplicar direccionamiento VLSM (`/28` para servidores y `/26` para plantilla y clientes) en lugar de subredes de tamaño fijo
+### 6.2 Decisión: Aplicar direccionamiento VLSM (`/28` para servidores y `/26` para plantilla y clientes) en lugar de subredes de tamaño fijo
 - **Fecha:** 3 de noviembre de 2026
 - **Contexto:** La gestoría partía de una única red plana `192.168.1.0/24` sin aislamiento entre departamentos. Al dividir la red en tres VLANs (`SERVIDORES`, `PLANTILLA` y `CLIENTES`), era necesario repartir el direccionamiento interno ajustándolo al volumen real de equipos de cada zona.
 - **Opciones que valoramos:**
@@ -745,7 +747,7 @@ Este documento recoge las decisiones técnicas tomadas durante la implantación 
 
 ---
 
-### Decisión: Bloquear el tráfico ICMP (`ping`) desde `VLAN 20` hacia `VLAN 10` permitiendo únicamente los puertos TCP `80` y `445`
+### 6.3 Decisión: Bloquear el tráfico ICMP (`ping`) desde `VLAN 20` hacia `VLAN 10` permitiendo únicamente los puertos TCP `80` y `445`
 - **Fecha:** 3 de noviembre de 2026
 - **Contexto:** Los empleados de la plantilla (`VLAN 20`) necesitan acceder a la aplicación web interna (`HTTP`, puerto `80`) y a las carpetas compartidas (`Samba`, puerto `445`) alojadas en `srv-mareas` (`192.168.1.10`, `VLAN 10`). Sin embargo, dejar abierto todo el tráfico entre `VLAN 20` y `VLAN 10` permitiría que un puesto de empleado comprometido realizara reconocimientos de red (`ping sweeps`) o atacara otros servicios del servidor.
 - **Opciones que valoramos:**
@@ -756,7 +758,7 @@ Este documento recoge las decisiones técnicas tomadas durante la implantación 
 
 ---
 
-### Decisión: Acotar por IP origen (`192.168.122.50`) el reenvío NAT del servicio FTP aceptando temporalmente el intercambio sin cifrar
+### 6.4 Decisión: Acotar por IP origen (`192.168.122.50`) el reenvío NAT del servicio FTP aceptando temporalmente el intercambio sin cifrar
 - **Fecha:** 3 de noviembre de 2026
 - **Contexto:** La gestoría colabora con una Asesoría Fiscal externa (`192.168.122.50`) que envía y descarga documentación mediante FTP clásico (puerto de control `21` y rango de datos pasivos `40000-40050`), un protocolo que transmite usuario, contraseña y ficheros en texto claro.
 - **Opciones que valoramos:**
@@ -768,7 +770,7 @@ Este documento recoge las decisiones técnicas tomadas durante la implantación 
 
 ---
 
-### Decisión: Configurar la IP estática de `Portatil` (Ubuntu Desktop) desde NetworkManager gráfico en lugar de comandos `ip addr` / `ip route`
+### 6.5 Decisión: Configurar la IP estática de `Portatil` (Ubuntu Desktop) desde NetworkManager gráfico en lugar de comandos `ip addr` / `ip route`
 - **Fecha:** 3 de noviembre de 2026
 - **Contexto:** En `propuesta.md` se planteaba asignar la dirección `192.168.1.68/26` en `Portatil` mediante comandos `sudo ip addr add` e `ip route add`. Al ejecutarlos en el entorno de escritorio Ubuntu, el demonio `NetworkManager` sobrescribió la interfaz `ens3` a los pocos segundos provocando el error `Error: Nexthop has invalid gateway` y perdiendo la configuración tras reiniciar.
 - **Opciones que valoramos:**

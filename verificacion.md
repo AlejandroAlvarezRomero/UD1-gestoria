@@ -1,5 +1,7 @@
 # 1. Verificación del cifrado del portatil y la partición del servidor
 
+## 1.1 Verificación del cifrado del servidor
+
 ![Verificación del volumen cifrado](<Images/Server5.png>)
 
 Después de completar todos los pasos, la configuración del servidor queda de la siguiente manera:
@@ -41,7 +43,7 @@ Las comprobaciones realizadas con `lsblk`, `df -h` y `cryptsetup status` confirm
 
 **Nota final:** El montaje realizado es temporal. Si se reinicia el servidor, será necesario volver a desbloquear el volumen e iniciar el montaje. Para automatizar este proceso habría que configurar `/etc/crypttab` y `/etc/fstab`.
 
-## Verificación Portatil
+## 1.2 Verificación del portátil
 
 La verificación consiste en comprobar que nos pide una contraseña para el cifrado el encender la máquina virutal y que el usuario para Laura está creado con su propia contraseña.
 
@@ -99,13 +101,13 @@ Finalmente, se ha creado la cuenta de usuario de Laura con su contraseña segura
 
 El resultado es una instalación de Ubuntu con almacenamiento cifrado, preparada para proteger la información en caso de pérdida o acceso no autorizado a la máquina virtual.
 
-# Luis
+# 2. Protección del sistema y confinamiento de servicios
 
-## Medida: Comprobar las protecciones del sistema y confinar un servicio
+## 2.1 Medida: Comprobar las protecciones del sistema y confinar un servicio
 
 **Equipo:** `srv-mareas` (Ubuntu 24.04.5 LTS, kernel 6.8) · **Implanta:** Luis Baena · **Comprueba:** Raúl
 
-### 1. Punto de partida: qué traía el sistema
+### 2.1.1 Punto de partida: qué traía el sistema
 
 Antes de cambiar nada, revisamos 17 parámetros de protección del núcleo:
 
@@ -133,7 +135,7 @@ Ningún servicio expuesto venía confinado: AppArmor está activo, pero `vsftpd`
 
 ![AppArmor antes](Images/apparmor-antes.png)
 
-### 2. Núcleo: parámetros cerrados de forma permanente
+### 2.1.2 Núcleo: parámetros cerrados de forma permanente
 
 Los 8 parámetros abiertos se fijan en un fichero propio, `/etc/sysctl.d/99-mareas.conf` (los motivos están en `decisiones.md`, D-L1), y se aplican con `sudo sysctl --system`.
 
@@ -158,7 +160,7 @@ Tras reiniciar el servidor, los 8 mantienen el valor nuevo:
 
 ![Apport desactivado](Images/apport-desactivado.png)
 
-### 3. Confinamiento de Samba (`smbd`)
+### 2.1.3 Confinamiento de Samba (`smbd`)
 
 Antes de confinarlo, revisamos la configuración con `testparm -s`: la carpeta compartida es `/srv/gestoria/clientes`, no hay recurso `[homes]` y `[printers]` usa `/var/tmp`. Con eso se decidieron las rutas de escritura permitidas.
 
@@ -182,7 +184,7 @@ El confinamiento se aplica con un drop-in en `/etc/systemd/system/smbd.service.d
 
 ![bloqueado](Images/smbd-bloqueado.png)
 
-### 4. La gestoría sigue trabajando
+### 2.1.4 La gestoría sigue trabajando
 
 Con Samba ya confinado, se crea una carpeta en el recurso de clientes, se lista y se borra sin errores:
 
@@ -196,11 +198,13 @@ Tras reiniciar el servidor se repitieron las pruebas con el mismo resultado: el 
 
 ---
 
-## Medida: Proteger el acceso a BIOS/UEFI y el arranque
+# 3. Protección del acceso a BIOS/UEFI y del arranque
+
+## 3.1 Medida: Proteger el acceso a BIOS/UEFI y el arranque
 
 **Equipos:** `srv-mareas` y `Portatil` · **Implanta:** Luis Baena · **Comprueba:** Hugo
 
-### 1. Punto de partida (igual en los dos equipos)
+### 3.1.1 Punto de partida (igual en los dos equipos)
 
 | Comprobación | Resultado |
 |---|---|
@@ -214,7 +218,7 @@ Las dos máquinas virtuales arrancan con **BIOS clásica (SeaBIOS)**, no con UEF
 
 ![bios legacy](Images/bios-legacy.png)
 
-### 2. Configuración aplicada en GRUB (servidor y portátil)
+### 3.1.2 Configuración aplicada en GRUB (servidor y portátil)
 
 1. Superusuario `admingrub` con la contraseña cifrada (PBKDF2) en `/etc/grub.d/40_custom`. La contraseña es distinta en cada equipo.
 2. `--unrestricted` en las entradas normales de Ubuntu (`/etc/grub.d/10_linux`).
@@ -226,20 +230,20 @@ En `grub.cfg` aparecen `superusers` y `password_pbkdf2`, las entradas de Ubuntu 
 
 ![update-grub](Images/update-grub.png)
 
-### 3. GRUB protege lo que no es el arranque normal
+### 3.1.3 GRUB protege lo que no es el arranque normal
 
 Al intentar editar una entrada (`e`) o arrancar una entrada no habitual, GRUB pide usuario y contraseña. Con credenciales incorrectas vuelve al menú sin dejar hacer nada; con las correctas se abre el editor. Se probó en los dos equipos con el mismo resultado.
 
 ![grub pide usuario](Images/portatil-memtest-protegido.png)
 
-### 4. El arranque normal no pide nada
+### 3.1.4 El arranque normal no pide nada
 
 - **Servidor:** se reinicia sin tocar nada y llega solo al login. Samba sigue dando servicio.
 - **Portátil:** GRUB pasa sin pedir nada y lo siguiente que aparece es la petición de la clave LUKS (`Please unlock disk vda4_crypt`). Esto confirma además que `/boot` no va cifrado, y por eso la contraseña de GRUB es necesaria también con el disco cifrado (`decisiones.md`, D-L8).
 
 ![portátil sin pedir](Images/portatil-grub-pasa-sin-pedir.png)
 
-### 5. Arranque solo desde disco (GNS3)
+### 3.1.5 Arranque solo desde disco (GNS3)
 
 | Ajuste | Servidor | Portátil |
 |---|---|---|
@@ -254,7 +258,7 @@ Al intentar editar una entrada (`e`) o arrancar una entrada no habitual, GRUB pi
 
 No se pudo probar a arrancar con una ISO, porque el servidor GNS3 no tiene ninguna imagen ISO disponible. En el equipo real, la prueba sería conectar un USB con Kali y comprobar que el equipo arranca igualmente desde su disco.
 
-### 6. La gestoría sigue trabajando
+### 3.1.6 La gestoría sigue trabajando
 
 - El servidor arranca sin intervención y Samba sigue sirviendo la carpeta de clientes.
 - Laura arranca su portátil igual que antes: solo la clave de LUKS (medida de cifrado) y su login.
@@ -262,9 +266,9 @@ No se pudo probar a arrancar con una ISO, porque el servidor GNS3 no tiene ningu
 
 ---
 
-# Revisar el acceso desde Internet y acotar el servicio FTP del router
+# 4. Revisar el acceso desde Internet y acotar el servicio FTP del router
 
-## 7. Verificación del FTP limitado desde Internet
+## 4.1 Verificación del FTP limitado desde Internet
 
 **Equipo de origen:** `Asesoria-fiscal` (`192.168.122.50`).
 
@@ -320,9 +324,9 @@ El servidor respondió `230 Login successful` y permitió listar archivos. Negoc
 ![Reglas de firewall](Images/ftp-firewall-router.png)
 ![Servicios del router](Images/ftp-servicios-router.png)
 
-# Eliminar la cuenta del becario y limitar privilegios
+# 5. Eliminar la cuenta del becario y limitar privilegios
 
-## 8. Verificación de la eliminación de la cuenta `becario`
+## 5.1 Verificación de la eliminación de la cuenta `becario`
 
 **Equipo comprobado:** `srv-mareas`.
 
@@ -344,14 +348,14 @@ Resultado:
 
 La comprobación completa de la sintaxis de sudoers queda pendiente de ejecutar `sudo visudo -c`, porque no se pudo realizar durante la implantación documentada.
 
-# Verificación de Medidas de Implantación: Segmentación y Seguridad de Red
+# 6. Segmentación y seguridad de red
 
 **Sesión de verificación:** Martes, 3 de noviembre de 2026  
 **Entorno:** Maqueta GNS3 — Infraestructura de red de **Mareas Asesores** (`Switch-oficina`, `Router-operadora`, `srv-mareas` y puestos cliente).
 
 ---
 
-### Medida: Segmentación de red en Capa 2 mediante VLANs y enlace troncal 802.1Q
+### 6.1 Medida: Segmentación de red en Capa 2 mediante VLANs y enlace troncal 802.1Q
 - **Qué se comprueba:** Que los puertos físicos de `Switch-oficina` quedan separados en tres dominios de difusión independientes (`VLAN 10 SERVIDORES`, `VLAN 20 PLANTILLA` y `VLAN 30 CLIENTES`) y que el puerto `Gi0/0` opera en modo `trunk` 802.1Q hacia el router, impidiendo que un equipo conectado en la sala de espera (`VLAN 30`) intercepte tráfico de Capa 2 de los empleados (`VLAN 20`) o del servidor (`VLAN 10`).
 - **Cómo se ha comprobado (orden, desde qué equipo):** Ejecución de `show vlan brief` y `show interfaces trunk` en la consola de `Switch-oficina`, más prueba de conectividad directa en Capa 2 desde `Movil-cliente` (`192.168.1.130`, `VLAN 30`) hacia `Puesto-1` (`192.168.1.69`, `VLAN 20`).
 - **Antes:**
@@ -385,7 +389,7 @@ La comprobación completa de la sintaxis de sudoers queda pendiente de ejecutar 
 
 ---
 
-### Medida: Direccionamiento IP mediante VLSM y Enrutamiento Inter-VLAN
+### 6.2 Medida: Direccionamiento IP mediante VLSM y Enrutamiento Inter-VLAN
 - **Qué se comprueba:** Que cada departamento utiliza una subred ajustada a sus necesidades reales (`/28` para servidores con 14 hosts útiles; `/26` para plantilla y clientes con 62 hosts útiles cada una), que las subinterfaces `vlan10`, `vlan20` y `vlan30` enrutadas en `ether7` de `Router-operadora` actúan como puertas de enlace y que todos los nodos finales tienen su IP estática y máscara configuradas sin solapamientos.
 - **Cómo se ha comprobado (orden, desde qué equipo):** Ejecución de `/ip address print` en `Router-operadora`, `ip a show ens3` y `ping 192.168.1.1` en `srv-mareas`, `ip a show ens3` y `ping 192.168.1.65` en `Portatil`, `ipconfig` en `Puesto-1` y `Puesto-2`, y `show ip` en `Impresora-1`, `Impresora-2` y `Movil-cliente`.
 - **Antes:**
@@ -421,7 +425,7 @@ La comprobación completa de la sintaxis de sudoers queda pendiente de ejecutar 
 
 ---
 
-### Medida: Aislamiento de la red WiFi de clientes/sala de espera (`VLAN 30`) mediante cortafuegos
+### 6.3 Medida: Aislamiento de la red WiFi de clientes/sala de espera (`VLAN 30`) mediante cortafuegos
 - **Qué se comprueba:** Que ningún dispositivo conectado en la red de clientes/invitados (`VLAN 30`, `192.168.1.128/26`) puede iniciar tráfico hacia la subred de servidores (`VLAN 10`, `192.168.1.0/28`) ni hacia los equipos e impresoras de la plantilla (`VLAN 20`, `192.168.1.64/26`).
 - **Cómo se ha comprobado (orden, desde qué equipo):** Desde `Movil-cliente` (`192.168.1.130`, situado en la red de riesgo `VLAN 30`), ejecución de `ping 192.168.1.129` (su puerta de enlace), `ping 192.168.1.10` (servidor) y `ping 192.168.1.69` (`Puesto-1`), junto con la revisión de `/ip firewall filter print` en `Router-operadora`.
 - **Antes:**
@@ -454,7 +458,7 @@ La comprobación completa de la sintaxis de sudoers queda pendiente de ejecutar 
 
 ---
 
-### Medida: Filtrado selectivo de servicios entre Plantilla y Servidores (`VLAN 20` -> `VLAN 10`)
+### 6.4 Medida: Filtrado selectivo de servicios entre Plantilla y Servidores (`VLAN 20` -> `VLAN 10`)
 - **Qué se comprueba:** Que los puestos de empleados (`VLAN 20`) solo pueden comunicarse con el servidor `srv-mareas` (`192.168.1.10`, `VLAN 10`) mediante los puertos autorizados de trabajo (**TCP 80 HTTP** y **TCP 445 Samba**), descartándose cualquier otro protocolo o sondeo (como paquetes ICMP `ping` o puertos administrativos no permitidos).
 - **Cómo se ha comprobado (orden, desde qué equipo):** Desde `Portatil` (`192.168.1.68`, `VLAN 20`), ejecución de `ping 192.168.1.10` (intento de tráfico ICMP bloqueado) y acceso mediante navegador Firefox a `http://192.168.1.10` (tráfico permitido en puerto TCP `80`).
 - **Antes:**
@@ -483,7 +487,7 @@ La comprobación completa de la sintaxis de sudoers queda pendiente de ejecutar 
 
 ---
 
-### Medida: Acceso externo acotado por IP origen para la Asesoría Fiscal (`NAT / FTP`)
+### 6.5 Medida: Acceso externo acotado por IP origen para la Asesoría Fiscal (`NAT / FTP`)
 - **Qué se comprueba:** Que la redirección de puertos FTP (`dst-nat` en TCP `21` y rango pasivo `40000-40050`) hacia `srv-mareas` (`192.168.1.10`) en la interfaz exterior `ether6` (`192.168.122.51`) acepta exclusivamente conexiones procedentes de la IP autorizada de la Asesoría Fiscal (`192.168.122.50`), descartando peticiones de cualquier otra dirección externa.
 - **Cómo se ha comprobado (orden, desde qué equipo):** Revisión de `/ip firewall nat print` en `Router-operadora` y prueba de conexión `ftp 192.168.122.51` desde `Asesoria-fiscal` (`192.168.122.50`) frente a un intento desde otra IP externa no autorizada.
 - **Antes:**
