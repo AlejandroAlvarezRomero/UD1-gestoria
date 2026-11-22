@@ -76,8 +76,8 @@ Se ha modificado el orden de asignación en la VLAN 10 para garantizar que el se
 - **Qué problema resuelve y cómo lo sabemos:** El servidor expone servicios innecesarios (`inetd` en puerto 23, NetBIOS 137/138, DNS, etc.) y Samba permite acceso de invitado a toda la LAN.
 - **Qué hacemos:** quitar y acotar
 - **Qué cambiamos y en qué equipo:** En el servidor:
-  1. **Se quita:** Desinstalar/deshabilitar `inetd`, `avahi-daemon`, DNS innecesario y deshabilitar NetBIOS.
-  2. **Se acota:** En `/etc/samba/smb.conf`, restringir el acceso (`hosts allow = 192.168.1.0/26 127.0.0.1`), forzar protocolo SMB3 y deshabilitar el acceso de invitado.
+  1. **Se quita:** Deshabilitar `inetd`, `avahi-daemon` y el servicio DNS que se confirme innecesario, sin afectar al resolvedor local de Ubuntu; deshabilitar NetBIOS.
+  2. **Se acota:** En `/etc/samba/smb.conf`, restringir el acceso a la VLAN 20 (`hosts allow = 192.168.1.64/26 127.0.0.1`), forzar protocolo SMB3 y deshabilitar el acceso de invitado.
 - **A quién afecta:** A toda la plantilla, que ahora debe usar su usuario y contraseña para entrar a Samba.
 - **Cómo comprobaremos que protege y que la gestoría sigue trabajando:** `ss -tulpn` mostrará una reducción drástica de puertos a la escucha. Los puestos de trabajo Windows accederán a Samba introduciendo credenciales.
 

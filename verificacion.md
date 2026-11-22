@@ -517,6 +517,178 @@ La comprobación completa de la sintaxis de sudoers queda pendiente de ejecutar 
 
 ---
 
+## 7. Inventariar, reducir y acotar los servicios del servidor (7a)
+
+**Estado:** Pendiente de ejecutar y verificar en GNS3.
+**Equipo:** `srv-mareas` (Ubuntu Server, `192.168.1.10`, VLAN 10).
+**Implanta:** Raúl Toledo Procopio · **Comprueba:** Hugo Pérez Arévalo.
+
+Esta ficha es el procedimiento de trabajo. Los comandos y resultados que aparecen aquí son los que se deben ejecutar el lunes; todavía no son resultados obtenidos. Al terminar, sustituir los marcadores de captura por las imágenes reales y actualizar el estado en `responsables.md`.
+
+### 7.1 Abrir el servidor y registrar el estado inicial
+
+1. En GNS3, abrir el proyecto y arrancar `srv-mareas` si está apagado.
+2. Abrir la consola del nodo e iniciar sesión con una cuenta con permisos `sudo`.
+3. Confirmar que se está trabajando en el servidor correcto y que conserva su dirección:
+
+   ```bash
+   hostname
+   ip -br address
+   ```
+
+4. Guardar el inventario inicial de puertos y servicios:
+
+   ```bash
+   sudo ss -tulpn
+   systemctl --type=service --state=running
+   systemctl list-unit-files --type=service | grep -Ei 'inetd|avahi|bind9|named|dnsmasq|nmbd|smbd'
+   ```
+
+   La última orden puede no mostrar resultados si no hay unidades con esos nombres; en ese caso, revisar también el inventario completo. Anotar qué servicios aparecen y qué procesos escuchan en cada puerto. No desactivar un servicio solo por su nombre: confirmar antes que no lo necesita el servidor.
+
+![7A-1: Consola de `srv-mareas` con hostname, IP e inventario inicial de puertos y servicios](Images/captura-7a-1.png)
+
+### 7.2 Identificar qué servicios se pueden retirar
+
+Revisar el inventario del paso anterior y decidir:
+
+- **`inetd`:** si está instalado y no presta ningún servicio necesario, identificar el nombre exacto de su unidad y detenerla/deshabilitarla. Por ejemplo, usar `inetd.service` solo si ese es el nombre que muestra el sistema:
+
+  ```bash
+  sudo systemctl disable --now inetd.service
+  ```
+
+- **`avahi-daemon`:** si está instalado y no se usa para descubrir servicios en la red, deshabilitarlo:
+
+  ```bash
+  sudo systemctl disable --now avahi-daemon.service
+  ```
+
+- **DNS:** deshabilitar únicamente un servidor DNS (por ejemplo, `bind9`, `named` o `dnsmasq`) si se confirma que no lo usa ningún equipo. No deshabilitar `systemd-resolved` por esta medida: suele ser el resolvedor local del propio Ubuntu, no un servicio DNS que se ofrezca a la red.
+- **NetBIOS:** se deshabilitará para Samba en el paso 7.3. Si existe `nmbd.service`, detenerlo y deshabilitarlo después de comprobar que los puestos pueden acceder al recurso por IP y SMB:
+
+  ```bash
+  sudo systemctl disable --now nmbd.service
+  ```
+
+Si una unidad no existe, no ejecutar a ciegas el ejemplo: usar el nombre exacto encontrado en el inventario o anotar que ese servicio no está instalado. No desinstalar paquetes en esta práctica; deshabilitar el servicio permite revertir el cambio si se detecta una dependencia. Para recuperar un servicio que se haya deshabilitado y resulte necesario, usar su nombre exacto:
+
+```bash
+sudo systemctl enable --now nombre-de-la-unidad.service
+```
+
+![7A-2: Inventario de unidades y decisión de cuáles deshabilitar o mantener](Images/captura-7a-2.png)
+
+### 7.3 Hacer copia y limitar Samba a la VLAN de empleados
+
+1. Revisar la configuración actual del recurso y crear una copia antes de editar:
+
+   ```bash
+   sudo testparm -s
+   sudo cp -a /etc/samba/smb.conf /etc/samba/smb.conf.bak-7a
+   sudo nano /etc/samba/smb.conf
+   ```
+
+   Si `/etc/samba/smb.conf.bak-7a` ya existe de un intento anterior, conservarlo y crear la copia actual con otro nombre; usar esa copia si hay que revertir.
+
+2. En la sección `[global]`, actualizar las opciones existentes —sin dejar valores duplicados o contradictorios— para que queden así:
+
+   ```ini
+   [global]
+   hosts allow = 192.168.1.64/26 127.0.0.1
+   map to guest = Never
+   server min protocol = SMB3_00
+   disable netbios = yes
+   smb ports = 445
+   ```
+
+   `192.168.1.64/26` corresponde a la VLAN 20 (`192.168.1.64`–`192.168.1.127`); `192.168.1.0/26` no es la red de empleados. Mantener el nombre y la ruta actuales del recurso `[clientes]`; no sustituirlos por datos de ejemplo.
+
+3. En la sección existente `[clientes]`, establecer:
+
+   ```ini
+   guest ok = no
+   ```
+
+   Mantener las opciones de escritura y la ruta actuales si son necesarias para el trabajo de la gestoría. No añadir una segunda sección `[clientes]`.
+
+4. Validar la sintaxis antes de reiniciar Samba:
+
+   ```bash
+   sudo testparm
+   ```
+
+   Si `testparm` muestra errores, no reiniciar el servicio: corregir el archivo y volver a validar. Si la validación es correcta, aplicar los cambios:
+
+   ```bash
+   sudo systemctl restart smbd
+   sudo systemctl status smbd --no-pager
+   ```
+
+   Si el servicio no vuelve a arrancar, restaurar la copia y comprobarla antes de volver a intentarlo:
+
+   ```bash
+   sudo cp -a /etc/samba/smb.conf.bak-7a /etc/samba/smb.conf
+   sudo testparm
+   sudo systemctl restart smbd
+   ```
+
+![7A-3: Configuración efectiva de Samba y resultado satisfactorio de testparm](Images/captura-7a-3.png)
+
+### 7.4 Comprobar la reducción de puertos
+
+Después de los cambios, ejecutar:
+
+```bash
+sudo ss -tulpn
+```
+
+Comparar con la captura inicial. Comprobar que ya no escuchan los servicios que se hayan deshabilitado. Samba debe seguir disponible por TCP `445`; NetBIOS (`137/udp`, `138/udp` y `139/tcp`) no debe estar expuesto. No exigir que desaparezcan servicios que se hayan identificado y justificado como necesarios.
+
+![7A-4: Puertos tras los cambios, con Samba en TCP 445 y sin los servicios retirados](Images/captura-7a-4.png)
+
+### 7.5 Verificar el acceso de la plantilla y el bloqueo de invitados
+
+Desde un equipo de la plantilla conectado a VLAN 20 (por ejemplo, `Portatil`, `192.168.1.68`):
+
+1. Abrir `\\192.168.1.10\clientes` en el explorador de archivos.
+2. Cuando se solicite, iniciar sesión con una cuenta autorizada de Samba; comprobar que se puede abrir el recurso y realizar las operaciones de trabajo previstas.
+3. Comprobar que el acceso sin credenciales no permite entrar. Si Windows reutiliza credenciales guardadas, realizar esta prueba desde un cliente sin una sesión previa de Samba o usar una sesión de invitado explícita.
+
+No usar `ping` como prueba de disponibilidad del servidor desde VLAN 20: el firewall de la maqueta bloquea ICMP entre VLAN 20 y VLAN 10. La prueba válida para esta medida es el acceso al recurso por SMB/TCP 445.
+
+![7A-5: Acceso correcto al recurso clientes desde VLAN 20 con una cuenta autorizada](Images/captura-7a-5.png)
+
+![7A-6: Intento de acceso de invitado o sin credenciales rechazado](Images/captura-7a-6.png)
+
+### 7.6 Comprobar persistencia y documentar el resultado
+
+Cuando las pruebas anteriores hayan sido satisfactorias y se pueda interrumpir el servidor, reiniciar `srv-mareas` desde GNS3. Después del arranque:
+
+```bash
+sudo ss -tulpn
+sudo systemctl is-enabled smbd
+sudo systemctl is-active smbd
+```
+
+Confirmar que Samba continúa activo, que los servicios deshabilitados siguen detenidos y que el equipo de VLAN 20 mantiene acceso al recurso. Si el servidor pide desbloquear o montar un volumen cifrado al arrancar, hacerlo conforme al procedimiento del proyecto antes de probar los documentos.
+
+![7A-7: Comprobaciones posteriores al reinicio y acceso SMB restaurado](Images/captura-7a-7.png)
+
+**Resultado real (completar el lunes):**
+- Servicios deshabilitados y motivo: `[anotar]`
+- Puertos que siguen escuchando y motivo: `[anotar]`
+- Acceso autenticado desde VLAN 20: `[correcto / incorrecto; describir]`
+- Acceso de invitado: `[bloqueado / no comprobado; describir]`
+- Persistencia tras reiniciar: `[correcta / incorrecta / no comprobada; describir]`
+- Incidencias o cambios revertidos: `[anotar o indicar “ninguno”]`
+- Fecha de ejecución: `[completar]`
+- Comprobado por: `[completar]`
+
+**Criterio para marcar la medida como verificada:** la configuración pasa `testparm`, los servicios innecesarios seleccionados ya no escuchan, Samba sigue activo solo en los puertos previstos, una cuenta autorizada de VLAN 20 accede al recurso, el acceso de invitado queda bloqueado y los cambios persisten tras reiniciar. Si alguna comprobación no se realiza, dejarla indicada como pendiente y no marcar la medida como verificada.
+
+---
+
 ## Criterios de Aceptación del Cliente
 
 | Criterio de aceptación | Dónde se comprueba |
@@ -527,4 +699,4 @@ La comprobación completa de la sintaxis de sudoers queda pendiente de ejecutar 
 | **4. Que la Asesoría Fiscal externa pueda enviar y recibir ficheros por FTP sin abrir el servidor a todo Internet** | Ficha **«Acceso externo acotado por IP origen para la Asesoría Fiscal (`NAT / FTP`)»** (`dst-nat` en `ether6` puertos `21` y `40000-40050` acotado a `src-address=192.168.122.50`). |
 | **5. Que la plantilla pueda seguir trabajando con normalidad (web interna, carpetas compartidas e impresoras)** | Ficha **«Filtrado selectivo de servicios entre Plantilla y Servidores (`VLAN 20` -> `VLAN 10`)»** (acceso web a `http://192.168.1.10` en Firefox y apertura de TCP `445`) y Ficha **«Direccionamiento IP mediante VLSM y Enrutamiento Inter-VLAN»** (comunicación con `Impresora-1` e `Impresora-2` en `VLAN 20`). |
 | **6. Que la red esté ordenada por departamentos y sin desperdicio de direcciones IP** | Ficha **«Direccionamiento IP mediante VLSM y Enrutamiento Inter-VLAN»** (subredes `/28` en `VLAN 10` y `/26` en `VLAN 20` y `VLAN 30`). |
-| **7. Que las configuraciones sean persistentes tras reiniciar y no interrumpan el servicio** | Campo **«¿Sigue funcionando tras reiniciar?»** de las 5 fichas (`write memory` en Cisco, persistencia nativa en MikroTik, Netplan en Ubuntu Server, `save` en VPCS y NetworkManager Manual en `Portatil`). |
+| **7. Que las configuraciones sean persistentes tras reiniciar y no interrumpan el servicio** | Campo **«¿Sigue funcionando tras reiniciar?»** de las fichas de red y la ficha **«Inventariar, reducir y acotar los servicios del servidor»** (persistencia de servicios y acceso Samba tras reiniciar `srv-mareas`). |

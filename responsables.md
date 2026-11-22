@@ -17,6 +17,6 @@ Cada medida tiene una persona que la implanta y otra que la verifica. La persona
 | Proteger el acceso a BIOS/UEFI y el arranque                         | Luis      | Hugo      | Verificado |
 | Cifrado de disco (LUKS) en portátil y servidor                      | Raúl     | Alejandro | Verificado |
 | Documentar una instalación inicial controlada y mínima             | Raúl     | Luis      | Verificado |
-| Inventariar, reducir y acotar los servicios del servidor             | Raúl    | Hugo      | Verificado |
+| Inventariar, reducir y acotar los servicios del servidor             | Raúl    | Hugo      | Pendiente  |
 | Aislar la red de clientes mediante VLAN                              | Alejandro | Raúl     | Verificado |
 | Segmentar la red interna mediante VLAN                               | Alejandro | Luis      | Verificado |
