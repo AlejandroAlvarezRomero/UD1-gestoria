@@ -1,0 +1,42 @@
+/* Deck-only type and small marks. The stage stays the neutral editorial system. */
+
+.big {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 0.98;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.soft {
+  font-family: var(--font-sans);
+  font-weight: 450;
+  letter-spacing: -0.01em;
+  line-height: 1.16;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+
+.mono-note {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.node-value-sans {
+  font-family: var(--font-sans);
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.rule-index {
+  font-family: var(--font-mono);
+  font-size: 30px;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}

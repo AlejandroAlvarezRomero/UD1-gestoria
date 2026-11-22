@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-22T14:45:44Z",
+  "title": "Design System: Mareas Asesores · Bastionado de redes",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinta",
+        "canonical": "#071417",
+        "tonalRamp": ["#071417", "#102329", "#2c4a49"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Papel",
+        "canonical": "#f2f0e8",
+        "tonalRamp": ["#35463f", "#52645f", "#5b6d68", "#8aa09a", "#c9d2ce", "#c9d8d4", "#e7ece8", "#f2f0e8"]
+      },
+      "water": {
+        "role": "secondary",
+        "displayName": "Línea de agua",
+        "canonical": "#9fd8ce",
+        "tonalRamp": ["#0f6a63", "#9fd8ce"]
+      },
+      "amber": {
+        "role": "primary",
+        "displayName": "Ámbar",
+        "canonical": "#e9a23b",
+        "tonalRamp": ["#8a5200", "#e9a23b"]
+      },
+      "amber-on-paper": {
+        "role": "primary",
+        "displayName": "Ámbar de anotación",
+        "canonical": "#8a5200",
+        "tonalRamp": ["#8a5200", "#e9a23b"]
+      },
+      "teal": {
+        "role": "secondary",
+        "displayName": "Teal",
+        "canonical": "#0f6a63",
+        "tonalRamp": ["#0f6a63", "#9fd8ce"]
+      },
+      "paper-ink": {
+        "role": "neutral",
+        "displayName": "Tinta de papel",
+        "canonical": "#162421",
+        "tonalRamp": ["#162421", "#35463f", "#52645f", "#5b6d68", "#8aa09a", "#c9d2ce", "#e7ece8", "#f2f0e8"]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Apagado sobre tinta",
+        "canonical": "#a8bcb7",
+        "tonalRamp": ["#a8bcb7"]
+      },
+      "paper-muted": {
+        "role": "neutral",
+        "displayName": "Apagado sobre papel",
+        "canonical": "#5b6d68",
+        "tonalRamp": ["#5b6d68", "#8aa09a", "#c9d2ce"]
+      },
+      "line-paper": {
+        "role": "neutral",
+        "displayName": "Línea sobre papel",
+        "canonical": "#c9d2ce",
+        "tonalRamp": ["#c9d2ce", "#c9d8d4", "#e7ece8"]
+      },
+      "line-ink": {
+        "role": "neutral",
+        "displayName": "Línea sobre tinta",
+        "canonical": "rgba(242, 240, 232, 0.18)",
+        "tonalRamp": ["rgba(242, 240, 232, 0.12)", "rgba(242, 240, 232, 0.18)"]
+      },
+      "diagram-bg": {
+        "role": "neutral",
+        "displayName": "Papel del diagrama",
+        "canonical": "#e7ece8",
+        "tonalRamp": ["#c9d8d4", "#e7ece8", "#f2f0e8"]
+      },
+      "diagram-rule": {
+        "role": "neutral",
+        "displayName": "Regla del diagrama",
+        "canonical": "#c9d8d4",
+        "tonalRamp": ["#c9d2ce", "#c9d8d4", "#e7ece8"]
+      },
+      "diagram-before": {
+        "role": "neutral",
+        "displayName": "Bosquejo",
+        "canonical": "#52645f",
+        "tonalRamp": ["#35463f", "#52645f", "#5b6d68"]
+      },
+      "diagram-node": {
+        "role": "neutral",
+        "displayName": "Trazo del nodo",
+        "canonical": "#4b5b57",
+        "tonalRamp": ["#35463f", "#4b5b57", "#52645f"]
+      },
+      "technical-ink": {
+        "role": "neutral",
+        "displayName": "Técnico",
+        "canonical": "#35463f",
+        "tonalRamp": ["#162421", "#35463f", "#52645f"]
+      },
+      "footer-ink": {
+        "role": "neutral",
+        "displayName": "Pie",
+        "canonical": "#8aa09a",
+        "tonalRamp": ["#5b6d68", "#8aa09a", "#a8bcb7"]
+      },
+      "scrollbar-thumb": {
+        "role": "neutral",
+        "displayName": "Barra de desplazamiento",
+        "canonical": "#2c4a49",
+        "tonalRamp": ["#102329", "#2c4a49", "#0f6a63"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "El h1 de la portada y el h2 de cierre."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Títulos de sección."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Diagnóstico y medidas en modo sencillo."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Contexto, decisiones, modo técnico y controles."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Rótulos de medida y del diagrama."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "purpose": "Curva compartida por apariciones y cambios de modo."
+      },
+      {
+        "name": "ui-hover",
+        "value": "180ms ease",
+        "purpose": "Transición de color de enlaces y flecha de cierre."
+      },
+      {
+        "name": "knob",
+        "value": "240ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "purpose": "Desplazamiento del interruptor de medida."
+      },
+      {
+        "name": "swap-in",
+        "value": "420ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "purpose": "Entrada del texto técnico al sustituir al sencillo."
+      },
+      {
+        "name": "reveal-in",
+        "value": "850ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "purpose": "Aparición de los bloques al entrar en el viewport."
+      },
+      {
+        "name": "reveal-drift",
+        "value": "720ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "purpose": "Variante lateral en el diagnóstico y en la tercera decisión."
+      },
+      {
+        "name": "reveal-rise",
+        "value": "980ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "purpose": "Variante de recorrido mayor en las filas de medida pares."
+      }
+    ],
+    "breakpoints": [
+      { "name": "stack", "value": "900px" },
+      { "name": "compact", "value": "520px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Enlace de acción de portada",
+      "kind": "custom",
+      "refersTo": "link-hero",
+      "description": "Enlace «Ver la red» al pie del texto de portada: regla superior, ámbar y flecha al final.",
+      "html": "<a class=\"ds-link-hero\" href=\"#red\">Ver la red <span class=\"ds-link-arrow\" aria-hidden=\"true\">↓</span></a>",
+      "css": ".ds-link-hero { display: flex; justify-content: space-between; align-self: flex-start; width: min(100%, 22rem); border-top: 1px solid var(--line-ink); padding-top: 0.9rem; color: var(--amber); font-family: var(--display); font-weight: 600; text-decoration: none; transition: color 180ms ease; } .ds-link-hero:hover { color: var(--paper); } .ds-link-hero:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; }"
+    },
+    {
+      "name": "Enlace de cierre",
+      "kind": "custom",
+      "refersTo": "link-closing",
+      "description": "Cierre de la lámina: frase en display grande, subrayado grueso y flecha que se desplaza.",
+      "html": "<a class=\"ds-link-closing\" href=\"./slides/\">Abrir la presentación <span class=\"ds-link-arrow\" aria-hidden=\"true\">↗</span></a>",
+      "css": ".ds-link-closing { display: inline-flex; align-items: baseline; gap: 0.4rem; align-self: flex-start; color: var(--amber); font-family: var(--display); font-size: clamp(1.5rem, 2.6vw, 2.4rem); font-weight: 600; text-decoration: none; border-bottom: 2px solid currentColor; padding-bottom: 0.3rem; transition: color 180ms ease; } .ds-link-closing:hover { color: var(--paper); } .ds-link-closing .ds-link-arrow { display: inline-block; transition: transform 180ms ease; } .ds-link-closing:hover .ds-link-arrow { transform: translate(3px, -3px); } .ds-link-closing:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; }"
+    },
+    {
+      "name": "Enlace de cabecera",
+      "kind": "nav",
+      "refersTo": "link-header",
+      "description": "Enlace superior en mayúsculas con regla inferior que pasa a ámbar en hover.",
+      "html": "<a class=\"ds-link-header\" href=\"#diapositivas\">Diapositivas</a>",
+      "css": ".ds-link-header { border-bottom: 1px solid var(--line-ink); padding-bottom: 0.2rem; color: inherit; font-size: 0.86rem; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; transition: border-color 180ms ease, color 180ms ease; } .ds-link-header:hover { border-color: var(--amber); color: var(--amber); } .ds-link-header:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; }"
+    },
+    {
+      "name": "Interruptor de medida",
+      "kind": "button",
+      "refersTo": "mode-toggle",
+      "description": "Botón sin caja que sustituye la explicación sencilla por la técnica.",
+      "html": "<button class=\"ds-mode-toggle\" type=\"button\" aria-pressed=\"false\"><span class=\"ds-mode-switch\" aria-hidden=\"true\"><span class=\"ds-mode-knob\"></span></span><span class=\"ds-mode-text\">Ver cómo se hizo</span></button>",
+      "css": ".ds-mode-toggle { display: inline-flex; align-items: center; gap: 0.8rem; border: 0; border-bottom: 1px solid var(--teal); background: none; color: var(--teal); font-family: var(--body); font-size: 0.92rem; font-weight: 700; padding: 0 0 0.25rem; cursor: pointer; } .ds-mode-toggle:hover { color: var(--paper-ink); border-color: var(--paper-ink); } .ds-mode-toggle:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; } .ds-mode-switch { width: 36px; height: 18px; border: 1px solid currentColor; border-radius: 999px; display: inline-flex; align-items: center; padding: 2px; } .ds-mode-knob { width: 12px; height: 12px; border-radius: 50%; background: currentColor; transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1); } .ds-mode-toggle[aria-pressed=true] .ds-mode-knob { transform: translateX(16px); }"
+    },
+    {
+      "name": "Deslizador de red",
+      "kind": "input",
+      "refersTo": "slider-input",
+      "description": "Control de rango invisible sobre el escenario; el divisor recorta la capa posterior.",
+      "html": "<div class=\"ds-slider-wrap\"><div class=\"ds-diagram-stage\" style=\"--pos: 52%\"><div class=\"ds-diagram-layer ds-diagram-before\"></div><div class=\"ds-diagram-layer ds-diagram-after\"></div><span class=\"ds-diagram-divider\" aria-hidden=\"true\"><span class=\"ds-diagram-grip\"></span></span></div><input class=\"ds-slider-input\" type=\"range\" min=\"0\" max=\"100\" value=\"52\" aria-label=\"Comparar la red antes y después\" aria-valuetext=\"Vista: 52% del después\"></div>",
+      "css": ".ds-slider-wrap { position: relative; max-width: 1240px; margin: 0 auto; } .ds-diagram-stage { position: relative; aspect-ratio: 1200 / 620; background: #e7ece8; border: 1px solid var(--line-paper); overflow: hidden; } .ds-slider-wrap:focus-within .ds-diagram-stage { outline: 2px solid var(--teal); outline-offset: 4px; } .ds-diagram-layer { position: absolute; inset: 0; } .ds-diagram-after { clip-path: inset(0 calc(100% - var(--pos)) 0 0); } .ds-diagram-divider { position: absolute; top: 0; bottom: 0; left: var(--pos); width: 2px; background: var(--amber); transform: translateX(-1px); pointer-events: none; } .ds-diagram-grip { position: absolute; top: 50%; left: 50%; width: 30px; height: 30px; border: 2px solid var(--amber); border-radius: 50%; background: var(--paper); transform: translate(-50%, -50%); } .ds-slider-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }"
+    },
+    {
+      "name": "Fila de medida",
+      "kind": "custom",
+      "description": "Fila editorial de dos columnas: rótulo apagado y frase en display, sin caja ni sombra.",
+      "html": "<article class=\"ds-measure\"><div class=\"ds-measure-label\">La red</div><div class=\"ds-measure-content\"><p class=\"ds-measure-text\">Clientes, empleados y servidor ya no comparten red.</p></div></article>",
+      "css": ".ds-measure { display: grid; grid-template-columns: 11rem 1fr; gap: 3rem; padding: 2.6rem 0; border-bottom: 1px solid var(--line-paper); align-items: start; color: var(--paper-ink); } .ds-measure-label { font-family: var(--body); font-size: 0.82rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--paper-muted); padding-top: 0.55rem; } .ds-measure-text { font-family: var(--display); font-size: clamp(1.55rem, 2.5vw, 2.55rem); line-height: 1.18; letter-spacing: -0.028em; max-width: 36ch; margin: 0; } @media (max-width: 900px) { .ds-measure { grid-template-columns: 1fr; gap: 0.8rem; } .ds-measure-label { padding-top: 0; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "La lámina de mareas",
+    "overview": "La superficie es una lámina editorial de scroll continuo, no un panel de seguridad. La red aparece como un dibujo manipulable: dos capas SVG se recortan con un deslizador y las tres VLAN se leen como notas al margen, no como etiquetas decorativas. La fotografía del mar ocupa la mitad derecha de la portada a sangre; la otra mitad queda en tinta para una sola frase en grande, una línea de contexto y un enlace al pie.\n\nLa densidad es baja y la jerarquía se apoya en el hueco: reglas finas, sangrías grandes y filas de texto en lugar de contenedores. Se rechazan explícitamente el hero de dashboard y la fila de tarjetas; tampoco hay cajitas ni kicker sobre el titular. El ámbar es la única marca, y aparece de forma escasa: sobre tinta en los enlaces de acción y sobre papel solo en su variante oscurecida, dentro del diagrama.\n\nEl movimiento es de aparición y de manipulación, nunca de coreografía decorativa. Los bloques entran con un desplazamiento y un desenfoque breves al cruzar el umbral del observador; el texto de medida cambia de modo con un fundido; el tirador responde al dedo o al teclado. Todo eso vive en React, un `IntersectionObserver` y un `input[type=range]`: no hay otra capa de interacción.",
+    "keyCharacteristics": [
+      "Lámina de scroll continuo, derivada de un seed y no un dashboard.",
+      "Una sola marca ámbar sobre tinta; variante oscurecida para anotaciones sobre papel.",
+      "Reglas finas y sangrías grandes en lugar de cajas.",
+      "La red se manipula; las VLAN se explican como notas al margen.",
+      "Fotografía real a sangre y tipografías autoc-hosteadas."
+    ],
+    "rules": [
+      {
+        "name": "The One Mark Rule",
+        "body": "El ámbar es la única marca y nunca se convierte en fondo de caja; sobre papel se usa su variante oscurecida.",
+        "section": "colors"
+      },
+      {
+        "name": "The Waterline Rule",
+        "body": "El agua abre y cierra los bloques sobre tinta; el teal nombra las decisiones sobre papel. Cada color tiene un lado de la lámina.",
+        "section": "colors"
+      },
+      {
+        "name": "The Natural Sentence Rule",
+        "body": "El titular es la frase de siempre dicha en voz alta: sin texto previo, sin analogía de dos líneas y sin lenguaje técnico en la capa sencilla.",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "Do mantener la portada en dos mitades con la fotografía a sangre a la derecha y el h1 en la izquierda sobre tinta.",
+      "Do usar el agua para separar bloques sobre tinta y el teal para nombrar decisiones sobre papel.",
+      "Do dejar que el deslizador gobierne la lectura de la red; las VLAN se explican al margen del dibujo.",
+      "Do mantener el modo técnico como sustitución del sencillo, con el texto cambiando de familia y de ancho de lectura.",
+      "Do escribir lo pendiente con la misma voz que lo hecho, separado por una regla."
+    ],
+    "donts": [
+      "Don't convertir la página en un panel de seguridad ni disponer los contenidos en una fila de tarjetas.",
+      "Don't añadir cajas de fondo, radios ni sombras: la jerarquía la hacen la regla y el hueco.",
+      "Don't poner texto de apoyo por encima del h1 de la portada: la frase abre directamente.",
+      "Don't usar el ámbar claro sobre papel para texto; para eso existe la variante oscurecida del diagrama.",
+      "Don't presentar la medida pendiente como terminada ni disfrazar el FTP en claro como resuelto.",
+      "Don't introducir otra biblioteca de interacción: el build se sostiene con React, `IntersectionObserver` y el input de rango."
+    ]
+  }
+}

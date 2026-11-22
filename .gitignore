@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.vite/
+
+# Impeccable working material (design decisions live in DESIGN.md and .impeccable/surfaces/)
+.impeccable/review/
+.impeccable/mocks/
+.impeccable/questions/
+.impeccable/build/
+.impeccable/roll.txt
+
+# OS
+Thumbs.db
+desktop.ini
