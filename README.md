@@ -12,4 +12,4 @@
 - [Aprendizaje](aprendizaje.md)
 
 ## GitHub Page
-[Ver la página del proyecto](PEGA_AQUÍ_LA_URL_CUANDO_ESTÉ_PUBLICADA)
+[Ver la página del proyecto](https://alejandroalvarezromero.github.io/UD1-gestoria/)
